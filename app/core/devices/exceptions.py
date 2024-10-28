@@ -1,0 +1,2 @@
+class NoQueryIdDeviceError(Exception):
+    pass

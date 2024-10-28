@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:alpine3.19
+    environment:
+      POSTGRES_DB: app-db
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ./tmp/db:/var/lib/postgresql/data
+
+  app:
+    build:
+      target: local
+      dockerfile: Dockerfile.app
+    command: >
+      wait4x tcp db:5432 --timeout 120s
+      --
+      python manage.py runserver 0.0.0.0:8000
+    ports:
+      - 18000:8000
+    volumes:
+      - ./app:/app
+      - ./tmp/dev:/tmp/dev
+    environment:
+      DEBUG: true
+      DATABASE_URL: postgres://postgres@db:5432/app-db
+      FINGERPRINT_SERVER_API_KEY: eJX9OrOWbZd9bVeHcVUg
+      FINGERPRINT_MANAGEMENT_API_KEY: 0dtjWWgEGQzHOiEr3C32
+      MCRYPT_KEY: kTMwZPVNixtc_nI4sqJcV4sybRlQZFb6P7LWE_ZNR6g=
+      SECRET_KEY: local!@pj#0nr%=a4znu#_6%7s89(43h+iv5#2@1%1-!e@6w)2

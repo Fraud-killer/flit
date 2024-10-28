@@ -1,0 +1,22 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+signit = "*"
+daphne = "*"
+django = "*"
+psycopg = "*"
+requests = "*"
+str2bool = "*"
+validators = "*"
+cryptography = "*"
+dj-database-url = "*"
+djangorestframework = "*"
+djangorestframework-simplejwt = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.12"
