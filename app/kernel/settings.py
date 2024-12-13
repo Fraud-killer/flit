@@ -1,6 +1,6 @@
 from pathlib import Path
 from datetime import timedelta
-from core.config import Config
+from kernel.config import Config
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -67,8 +67,8 @@ SIMPLE_JWT = {
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "core.authentication.handlers.JwtAuthentication",
-        "core.authentication.handlers.HmacAuthentication",
+        "authentication.handlers.JwtAuthentication",
+        "authentication.handlers.HmacAuthentication",
     ],
     'EXCEPTION_HANDLER': 'api.exceptions.handle_any_exception',
 }
