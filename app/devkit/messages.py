@@ -1,6 +1,13 @@
 from .message import Message
 
 
+msg_present = (
+    Message(
+        code="present",
+        text="Some texts that will be refined goes here",
+    )
+)
+
 msg_uuid = Message(code="uuid", text="Must be of uuid type")
 
 msg_email = Message(code="email", text="Must be a valid email address")

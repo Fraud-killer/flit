@@ -1,9 +1,9 @@
-from audit import events
 from devkit import undefined
 from devkit.struct import Struct
-from devkit.message import Message
 from core.models import Application
 from devkit.checks import is_uuid_str, is_dense_str
+from core.messages.applications import msg_app_ref_exist
+from devkit.messages import msg_uuid, msg_required, msg_dense_string
 
 
 def parse_register_device_inputs(id, request):
@@ -15,62 +15,30 @@ def parse_register_device_inputs(id, request):
 
     if not is_uuid_str(id):
         errors.append(
-            # TODO: Refine the below message for reuse
-            Message(
-                code="uuid",
-                path="id",
-                text="Some texts that will be refined goes here",
-            )
+            msg_uuid.new(path="id")
         )
     else:
         application = Application.objects.filter(id=id).first()
 
         if not application:
-            errors.append(
-                # TODO: Refine the below message for reuse
-                Message(
-                    code="app_ref_exist",
-                    path="id",
-                    text="Some texts that will be refined goes here",
-                )
-            )
-    
+            errors.append(msg_app_ref_exist.new(path="id"))
+
     if client_id is undefined:
         errors.append(
-            # TODO: Refine the below message for reuse
-            Message(
-                code="required",
-                path="client_id",
-                text="Some texts that will be refined goes here",
-            )
+            msg_required.new(path="client_id")
         )
     elif not is_dense_str(client_id):
         errors.append(
-            # TODO: Refine the below message for reuse
-            Message(
-                code="dense",
-                path="client_id",
-                text="Some texts that will be refined goes here",
-            )
+            msg_dense_string.new(path="client_id")
         )
 
     if device_query_id is undefined:
         errors.append(
-            # TODO: Refine the below message for reuse
-            Message(
-                code="required",
-                path="device_query_id",
-                text="Some texts that will be refined goes here",
-            )
+            msg_required.new(path="device_query_id")
         )
     elif not is_dense_str(device_query_id):
         errors.append(
-            # TODO: Refine the below message for reuse
-            Message(
-                code="dense",
-                path="device_query_id",
-                text="Some texts that will be refined goes here",
-            )
+            msg_dense_string.new(path="device_query_id")
         )
 
     data = None if errors else (

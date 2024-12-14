@@ -1,65 +1,43 @@
 from audit import events
 from devkit import undefined
 from devkit.struct import Struct
-from devkit.message import Message
 from core.models import Application
 from devkit.checks import is_uuid_str
+from devkit.messages import msg_in_choices, msg_uuid
+from core.messages.applications import msg_app_ref_exist
+
+
+modes_dict = {
+    "client": events.ClientEvent, 
+    "transaction": events.TransactionEvent,
+}
 
 
 def parse_audit_inputs(id, mode, request):
-    modes_dict = {
-        "client": events.ClientEvent, 
-        "transaction": events.TransactionEvent,
-    }
-
     event = None
     errors = list()
     application = None
 
     if mode not in modes_dict:
         errors.append(
-            # TODO: Refine the below message for reuse
-            Message(
-                code="in_choices",
+            msg_in_choices.new(
                 path="mode",
                 context=dict(choices=list(modes_dict)),
-                text="Some texts that will be refined goes here",
             )
         )
     else:
         event = modes_dict[mode](**request.data)
         errors.extend(event.verify())
 
-    if id is undefined:
+    if not is_uuid_str(id):
         errors.append(
-            # TODO: Refine the below message for reuse
-            Message(
-                code="required",
-                path="id",
-                text="Some texts that will be refined goes here",
-            )
-        )
-    elif not is_uuid_str(id):
-        errors.append(
-            # TODO: Refine the below message for reuse
-            Message(
-                code="uuid",
-                path="id",
-                text="Some texts that will be refined goes here",
-            )
+            msg_uuid.new(path="id")
         )
     else:
         application = Application.objects.filter(id=id).first()
 
         if not application:
-            errors.append(
-                # TODO: Refine the below message for reuse
-                Message(
-                    code="app_ref_exist",
-                    path="id",
-                    text="Some texts that will be refined goes here",
-                )
-            )
+            errors.append(msg_app_ref_exist.new(path="id"))
 
     data = None if errors else (
         Struct(

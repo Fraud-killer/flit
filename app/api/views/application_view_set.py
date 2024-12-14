@@ -1,13 +1,13 @@
 import asyncio
 from http import HTTPMethod
 from audit.auditor import Auditor
-from devkit.message import Message
 from api.base import build_api_response
 from api.parsers import parse_audit_inputs
 from rest_framework.viewsets import ViewSet
 from rest_framework.decorators import action
 from guards import DeviceGuard, ApplicationGuard
 from api.parsers import parse_register_device_inputs
+from core.messages.audits import msg_no_query_id_device
 from api.serializers.device_serializers import DeviceSerializer
 from services.create_device_by_query_id import CreateDeviceByQueryId, QueryIdDeviceNotFound
 
@@ -48,15 +48,7 @@ class ApplicationViewSet(ViewSet):
                 )
             )
         except QueryIdDeviceNotFound:
-            return build_api_response(
-                errors=[
-                    # TODO: Refine the below message for reuse
-                    Message(
-                        code="device_not_found",
-                        path="device_query_id",
-                        text="Some texts that will be refined goes here",
-                    )
-                ]
-            )
+            error_message = msg_no_query_id_device.new(path="device_query_id")
+            return build_api_response(errors=[error_message])
 
         return build_api_response(data=dict(device=DeviceSerializer(device).data))

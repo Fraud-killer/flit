@@ -28,18 +28,14 @@ class Config(metaclass=ConfigMeta):
         return dj_database_url.parse(database_url)
 
     @variable
-    def allowed_hosts(self, ctx):
-        value = ctx.load.env("ALLOWED_HOSTS")
-
-        if value is None:
-            debug = ctx.load.var("debug")[0]
-            value = '["*"]' if debug == True else "[]"
-
+    def csrf_trusted_origins(self, ctx):
+        value = ctx.load.env("CSRF_TRUSTED_ORIGINS")
+        value = "[]" if value is None else value
         return json.loads(value)
 
     @variable
-    def csrf_trusted_origins(self, ctx):
-        value = ctx.load.env("CSRF_TRUSTED_ORIGINS")
+    def allowed_hosts(self, ctx):
+        value = ctx.load.env("ALLOWED_HOSTS")
 
         if value is None:
             debug = ctx.load.var("debug")[0]

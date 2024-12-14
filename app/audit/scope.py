@@ -26,7 +26,7 @@ class Scope(LockCache):
 
         queryset = (
             Device.objects.filter(
-                end_user_id=self.event.client_id,
+                client_id=self.event.client_id,
                 fingerprint=visit_data.fingerprint,
                 application=self.policy.application,
             )

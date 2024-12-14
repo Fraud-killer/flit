@@ -23,4 +23,4 @@ class TransactionEvent:
 
         self.device_query_id = kwargs.get("device_query_id", undefined)
 
-    def verify(self): return list()  # TODO: Complete this implementations
+    def verify(self): return list()

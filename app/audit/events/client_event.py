@@ -6,4 +6,4 @@ class ClientEvent:
         self.client_id = kwargs.get("client_id", undefined)
         self.device_query_id = kwargs.get("device_query_id", undefined)
 
-    def verify(self): return list()  # TODO: Complete this implementation
+    def verify(self): return list()

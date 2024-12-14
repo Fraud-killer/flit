@@ -11,10 +11,7 @@ class Auditor:
 
     @classmethod
     async def audit(cls, event, policy):
-        # TODO: Ensure the event argument
-        # TODO: Ensure the policy argument
-
-        print(event.__dict__)
+        # TODO: Ensure the event and policy
 
         scope = Scope(event, policy)
 

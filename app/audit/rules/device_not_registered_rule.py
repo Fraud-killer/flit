@@ -1,6 +1,7 @@
 from devkit import undefined
-from devkit.message import Message
+from devkit.messages import msg_present
 from audit.events import ClientEvent, TransactionEvent
+from core.messages.audits import msg_device_not_registered
 
 from .base_rule import BaseRule
 
@@ -15,20 +16,7 @@ class DeviceNotRegisteredRule(BaseRule):
 
     async def perform(self):
         if self.scope.event.device_query_id in (None, undefined):
-            return (
-                # TODO: Refine the below message for reuse
-                Message(
-                    code="present",
-                    path="device_query_id",
-                    text="Some texts that will be refined goes here",
-                )
-            )
+            return msg_present.new(path="device_query_id")
 
-        if not await self.scope.fetch_device():
-            return (
-                # TODO: Refine the below message for reuse
-                Message(
-                    code="device_not_registered",
-                    text="Some texts that will be refined later goes here",
-                )
-            )
+        device = await self.scope.fetch_device()
+        if not device: return msg_device_not_registered
