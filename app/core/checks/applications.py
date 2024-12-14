@@ -1,14 +1,14 @@
-from bootkit import execute
+from devkit import execute
 from django.db.models import Q
 from kernel.mcrypt import decrypt
-from bootkit.checks import is_dense_string, is_trimmed_string
+from devkit.checks import is_dense_str, is_trimmed_str
 
 
 def is_app_secret_key(value):
-    return is_dense_string(value) and len(value) == 30
+    return is_dense_str(value) and len(value) == 30
 
 
-def is_app_encrypted_secret_key(value):
+def is_app_enc_secret_key(value):
     value, error = execute(decrypt, value)
     return not error and is_app_secret_key(value)
 
@@ -21,13 +21,13 @@ def is_app_device_sdk_key(data):
             "name",
             "token",
         }
-        and is_dense_string(data["id"])
-        and is_dense_string(data["token"])
-        and is_trimmed_string(data["name"])
+        and is_dense_str(data["id"])
+        and is_dense_str(data["token"])
+        and is_trimmed_str(data["name"])
     )
 
 
-def is_app_encrypted_device_sdk_key(value):
+def is_app_enc_device_sdk_key(value):
     data, error = execute(decrypt, value)
     return not error and is_app_device_sdk_key(data)
 

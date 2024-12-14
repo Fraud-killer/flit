@@ -1,2 +1,1 @@
 from .device_not_registered_rule import DeviceNotRegisteredRule as DeviceNotRegisteredRule
-from .aml_cft_limit_exceeded_rule import AmlCftLimitExceededRule as AmlCftLimitExceededRule

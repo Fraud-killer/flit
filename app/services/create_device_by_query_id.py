@@ -31,15 +31,7 @@ class CreateDeviceByQueryId:
                 fingerprint=visit_data.fingerprint,
             )
 
-        locations = [
-            dict(
-                city=visit_data.city,
-                state=visit_data.state,
-                country=visit_data.country,
-                latitude=visit_data.latitude,
-                longitude=visit_data.longitude,
-            )
-        ]
+        is_new_location = True
 
         for location in device.locations:
             if (
@@ -49,11 +41,21 @@ class CreateDeviceByQueryId:
                 and location["latitude"] == visit_data.latitude
                 and location["longitude"] == visit_data.longitude
             ):
-                continue
+                is_new_location = False
+                break
 
-            locations.append(location)
+        if is_new_location:
+            device.locations.insert(
+                0,
+                dict(
+                    city=visit_data.city,
+                    state=visit_data.state,
+                    country=visit_data.country,
+                    latitude=visit_data.latitude,
+                    longitude=visit_data.longitude,
+                )
+            )
 
-        device.locations = locations
         device.full_clean()
         device.save()
 

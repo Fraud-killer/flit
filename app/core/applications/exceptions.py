@@ -1,2 +1,0 @@
-class AppHasDeviceSdkKeyError(Exception):
-    pass

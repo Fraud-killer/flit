@@ -15,8 +15,6 @@ DEBUG = Config.debug
 
 LANGUAGE_CODE = "en-us"
 
-CSRF_TRUSTED_ORIGINS = ["https://flit-production-41839371145.us-central1.run.app"]
-
 ROOT_URLCONF = "kernel.urls"
 
 AUTH_USER_MODEL = "core.User"
@@ -32,6 +30,8 @@ ALLOWED_HOSTS = Config.allowed_hosts
 WSGI_APPLICATION = "kernel.wsgi.application"
 
 DATABASES = dict(default=Config.database_options)
+
+CSRF_TRUSTED_ORIGINS = Config.csrf_trusted_origins
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -70,7 +70,7 @@ REST_FRAMEWORK = {
         "auth.handlers.JwtAuthentication",
         "auth.handlers.HmacAuthentication",
     ],
-    'EXCEPTION_HANDLER': 'api.exceptions.handle_any_exception',
+    'EXCEPTION_HANDLER': 'api.exceptions.handle_exception',
 }
 
 TEMPLATES = [

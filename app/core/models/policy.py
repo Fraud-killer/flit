@@ -1,23 +1,22 @@
 from uuid import uuid4
-from bootkit import execute
+from devkit import execute
 from django.db import models
-from core.policies import entries
 
+from .base import policy_defaults
 from .application import Application
 
 
-def get_aml_cft_limit_default():
-    return entries.AmlCftLimit.default
-
-
 def get_kyc_level_limits_default():
-    return entries.KycLevelLimits.default
+    return policy_defaults.kyc_level_limits
 
 
 class Policy(models.Model):
+    defaults = policy_defaults
+
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    aml_cft_limit = models.JSONField(default=get_aml_cft_limit_default)
+    aml_cft_limit = models.CharField(default=defaults.aml_cft_limit)
     kyc_level_limits = models.JSONField(default=get_kyc_level_limits_default)
+    device_validity_days = models.IntegerField(default=defaults.device_validity_days)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

@@ -1,9 +1,9 @@
 import json
 import dj_database_url
-from bootkit import execute
-from bootkit.casts import to_bool
-from bootkit.mezages import mzg_hosts, mzg_to_bool
-from bootkit.config_meta import ConfigMeta, variable, VariableError
+from devkit import execute
+from devkit.casts import to_bool
+from devkit.messages import msg_to_bool, msg_hosts
+from devkit.config_meta import variable, ConfigMeta, VariableError
 
 
 class Config(metaclass=ConfigMeta):
@@ -20,7 +20,7 @@ class Config(metaclass=ConfigMeta):
         value = ctx.load.env("DEBUG", False)
         value, error = execute(to_bool, value)
         if not error: return value
-        raise VariableError(mzg_to_bool.text)
+        raise VariableError(msg_to_bool.text)
 
     @variable
     def database_options(self, ctx):
@@ -35,12 +35,17 @@ class Config(metaclass=ConfigMeta):
             debug = ctx.load.var("debug")[0]
             value = '["*"]' if debug == True else "[]"
 
-        value = execute(json.loads, value)[0]
+        return json.loads(value)
 
-        if isinstance(value, list):
-            return value
+    @variable
+    def csrf_trusted_origins(self, ctx):
+        value = ctx.load.env("CSRF_TRUSTED_ORIGINS")
 
-        raise VariableError(mzg_hosts.text)
+        if value is None:
+            debug = ctx.load.var("debug")[0]
+            value = '["*"]' if debug == True else "[]"
+
+        return json.loads(value)
 
     @variable
     def static_url(self, ctx):

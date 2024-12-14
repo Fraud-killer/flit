@@ -1,7 +1,6 @@
 import asyncio
 from http import HTTPMethod
 from audit.auditor import Auditor
-from rest_framework import status
 from devkit.message import Message
 from api.base import build_api_response
 from api.parsers import parse_audit_inputs
@@ -10,7 +9,7 @@ from rest_framework.decorators import action
 from guards import DeviceGuard, ApplicationGuard
 from api.parsers import parse_register_device_inputs
 from api.serializers.device_serializers import DeviceSerializer
-from services.create_device_by_query_id import QueryIdDeviceNotFound, CreateDeviceByQueryId
+from services.create_device_by_query_id import CreateDeviceByQueryId, QueryIdDeviceNotFound
 
 
 class ApplicationViewSet(ViewSet):

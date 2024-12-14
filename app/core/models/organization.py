@@ -1,5 +1,4 @@
 from uuid import uuid4
-from bootkit import execute
 from django.db import models
 
 from .user import User
@@ -13,6 +12,4 @@ class Organization(models.Model):
 
     owner = models.ForeignKey(User, on_delete=models.PROTECT)
 
-    def __str__(self):
-        owner = execute(lambda: self.owner)[0]
-        return f"{self.name} ({owner.email if owner else None})"
+    def __str__(self): return self.name

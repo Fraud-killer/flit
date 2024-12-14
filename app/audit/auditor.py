@@ -6,7 +6,6 @@ from devkit.struct import Struct
 
 class Auditor:
     rule_classes = (
-        rules.AmlCftLimitExceededRule,
         rules.DeviceNotRegisteredRule,
     )
 
