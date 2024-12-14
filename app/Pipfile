@@ -15,6 +15,7 @@ cryptography = "*"
 dj-database-url = "*"
 djangorestframework = "*"
 djangorestframework-simplejwt = "*"
+aiohttp = "*"
 
 [dev-packages]
 

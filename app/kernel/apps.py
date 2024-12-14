@@ -3,8 +3,8 @@ from django.apps import AppConfig
 
 class KernelConfig(AppConfig):
     def ready(self):
-        from core import config as config
         from core import signals as signals
+        from kernel import config as config
 
     name = "kernel"
     verbose_name = "Kernel"

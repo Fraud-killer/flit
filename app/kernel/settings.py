@@ -1,6 +1,6 @@
 from pathlib import Path
 from datetime import timedelta
-from core.config import Config
+from kernel.config import Config
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -14,8 +14,6 @@ TIME_ZONE = "UTC"
 DEBUG = Config.debug
 
 LANGUAGE_CODE = "en-us"
-
-CSRF_TRUSTED_ORIGINS = ["https://flit-production-41839371145.us-central1.run.app"]
 
 ROOT_URLCONF = "kernel.urls"
 
@@ -32,6 +30,8 @@ ALLOWED_HOSTS = Config.allowed_hosts
 WSGI_APPLICATION = "kernel.wsgi.application"
 
 DATABASES = dict(default=Config.database_options)
+
+CSRF_TRUSTED_ORIGINS = Config.csrf_trusted_origins
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
@@ -67,10 +67,10 @@ SIMPLE_JWT = {
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "core.authentication.handlers.JwtAuthentication",
-        "core.authentication.handlers.HmacAuthentication",
+        "auth.handlers.JwtAuthentication",
+        "auth.handlers.HmacAuthentication",
     ],
-    'EXCEPTION_HANDLER': 'api.exceptions.handle_any_exception',
+    'EXCEPTION_HANDLER': 'api.exceptions.handle_exception',
 }
 
 TEMPLATES = [

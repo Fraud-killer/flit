@@ -1,7 +1,7 @@
 from uuid import uuid4
-from bootkit import execute
+from devkit import execute
 from django.db import models
-from core.applications.base import generate_encrypted_secret_key
+from kernel.mcrypt import decrypt
 
 from .organization import Organization
 
@@ -9,13 +9,20 @@ from .organization import Organization
 class Application(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=80)
-    secret_key = models.CharField(max_length=512, default=generate_encrypted_secret_key)
-    device_sdk_key = models.CharField(max_length=512, default=None, null=True, blank=True)
+    secret_key = models.CharField(max_length=512, null=True, blank=True)
+    device_sdk_key = models.CharField(max_length=512, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     organization = models.ForeignKey(Organization, on_delete=models.CASCADE)
 
     def __str__(self):
-        organization = execute(lambda: self.organization)[0]
-        return f"{self.name} ({organization.name if organization else None})"
+        return self.name
+
+    @property
+    def raw_secret_key(self):
+        return decrypt(self.secret_key)
+
+    @property
+    def raw_device_sdk_key(self):
+        return decrypt(self.device_sdk_key)
