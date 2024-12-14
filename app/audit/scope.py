@@ -1,5 +1,6 @@
 from core.models import Device
-from fingerprint import FetchVisitData
+from asgiref.sync import sync_to_async
+from services.fingerprint import FetchVisitData
 from audit.lock_cache import LockCache, lockcache
 
 
@@ -13,18 +14,22 @@ class Scope(LockCache):
         self.policy = policy
 
     @lockcache()
+    async def fetch_visit_data(self):
+        return await FetchVisitData.async_call(
+            self.event.device_query_id
+        )
+
+    @lockcache()
     async def fetch_device(self):
         visit_data = await self.fetch_visit_data()
         if visit_data is None: return None
 
-        params = dict(
-            end_user_id=self.event.client_id,
-            fingerprint=visit_data.fingerprint,
-            application=self.policy.application,
+        queryset = (
+            Device.objects.filter(
+                end_user_id=self.event.client_id,
+                fingerprint=visit_data.fingerprint,
+                application=self.policy.application,
+            )
         )
 
-        return Device.objects.filter(**params).first()
-
-    @lockcache()
-    async def fetch_visit_data(self):
-        return FetchVisitData.call(self.event.device_query_id)
+        return await sync_to_async(queryset.first)()

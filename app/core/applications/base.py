@@ -1,5 +1,5 @@
 from os import urandom
-from core.mcrypt import encrypt
+from kernel.mcrypt import encrypt
 
 
 def generate_secret_key():

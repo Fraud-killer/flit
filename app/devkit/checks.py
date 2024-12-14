@@ -24,27 +24,27 @@ def can_be_bool(value):
     return not execute(to_bool, value)[1]
 
 
-def is_uuid_string(value):
+def is_uuid_str(value):
     return isinstance(value, str) and not execute(UUID, value)[1]
 
 
-def is_dense_string(value):
+def is_dense_str(value):
     return isinstance(value, str) and value.strip() and not bool(re.search(r"\s", value))
 
 
-def is_trimmed_string(value):
+def is_trimmed_str(value):
     return isinstance(value, str) and not re.search(r"(?:^\s|\s$)", value)
 
 
-def is_var_string(value):
+def is_var_str(value):
     return isinstance(value, str) and bool(re.fullmatch(var_regex, value, re.I))
 
 
-def is_key_string(value):
+def is_key_str(value):
     return isinstance(value, str) and bool(re.fullmatch(key_regex, value, re.I))
 
 
-def is_path_string(value):
+def is_path_str(value):
     return isinstance(value, str) and bool(re.fullmatch(path_regex, value, re.I))
 
 

@@ -1,6 +1,6 @@
 from bootkit import execute
 from django.db.models import Q
-from core.mcrypt import decrypt
+from kernel.mcrypt import decrypt
 from bootkit.checks import is_dense_string, is_trimmed_string
 
 

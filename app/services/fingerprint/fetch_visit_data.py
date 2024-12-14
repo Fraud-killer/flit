@@ -1,6 +1,7 @@
 import requests
 from devkit.struct import Struct
 from kernel.config import Config
+from aiohttp import ClientSession
 
 
 class FetchVisitData:
@@ -10,6 +11,12 @@ class FetchVisitData:
     @classmethod
     def call(cls, request_id):
         visit_data = cls.make_request(request_id)
+        if visit_data is None: return None
+        return cls.normalize_visit_data(visit_data)
+
+    @classmethod
+    async def async_call(cls, request_id):
+        visit_data = await cls.async_make_request(request_id)
         if visit_data is None: return None
         return cls.normalize_visit_data(visit_data)
 
@@ -30,6 +37,25 @@ class FetchVisitData:
         response.raise_for_status()
 
         return response.json()["products"]
+
+    @classmethod
+    async def async_make_request(cls, request_id):
+        url = f"{cls.server_api_url}/events/{request_id}"
+
+        headers = {
+            "accept": "application/json",
+            "content-type": "application/json",
+            "auth-api-key": cls.server_api_key,
+        }
+
+        async with ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 404:
+                    return None
+
+                response.raise_for_status()
+
+                return (await response.json())["products"]
 
     @classmethod
     def normalize_visit_data(cls, visit_data):

@@ -67,8 +67,8 @@ SIMPLE_JWT = {
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "authentication.handlers.JwtAuthentication",
-        "authentication.handlers.HmacAuthentication",
+        "auth.handlers.JwtAuthentication",
+        "auth.handlers.HmacAuthentication",
     ],
     'EXCEPTION_HANDLER': 'api.exceptions.handle_any_exception',
 }

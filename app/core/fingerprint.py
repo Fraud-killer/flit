@@ -1,5 +1,5 @@
 import requests
-from core.config import Config
+from kernel.config import Config
 
 
 class Fingerprint:

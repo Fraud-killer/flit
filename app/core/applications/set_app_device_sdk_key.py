@@ -4,7 +4,7 @@ from core.applications.mezages import (
 )
 
 from core.fingerprint import Fingerprint
-from core.mcrypt import encrypt, decrypt
+from kernel.mcrypt import encrypt, decrypt
 from core.applications.checks import is_app_device_sdk_key
 from core.applications.exceptions import AppHasDeviceSdkKeyError
 

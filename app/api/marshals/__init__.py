@@ -1,3 +1,0 @@
-from .audit_marshal import AuditMarshal as AuditMarshal
-from .register_device_marshal import RegisterDeviceMarshal as RegisterDeviceMarshal
-from .set_device_sdk_key_marshal import SetDeviceSdkKeyMarshal as SetDeviceSdkKeyMarshal

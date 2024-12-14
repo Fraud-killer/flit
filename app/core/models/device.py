@@ -5,9 +5,10 @@ from core.models.application import Application
 
 class Device(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
-    end_user_id = models.CharField(max_length=80)
-    raw_data = models.JSONField(default=dict)
+    client_id = models.CharField(max_length=80)
     fingerprint = models.CharField(max_length=80)
+    locations = models.JSONField(default=list)
+    raw_data = models.JSONField(default=dict)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

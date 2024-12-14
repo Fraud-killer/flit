@@ -2,7 +2,7 @@ import signit
 from kernel import mcrypt
 from auth.actor import Actor
 from core.models import Application
-from devkit.checks import is_uuid_string
+from devkit.checks import is_uuid_str
 from devkit import execute, create_hash_value
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.authentication import BaseAuthentication
@@ -13,7 +13,7 @@ class HmacAuthentication(BaseAuthentication):
         return "HMAC realm='api'"
 
     def prepare_application(self, client_id):
-        if not is_uuid_string(client_id):
+        if not is_uuid_str(client_id):
             return None
 
         application = Application.objects.filter(
