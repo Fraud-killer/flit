@@ -1,7 +1,7 @@
 import signit
 from kernel import mcrypt
+from auth.actor import Actor
 from core.models import Application
-from authentication.actor import Actor
 from devkit.checks import is_uuid_string
 from devkit import execute, create_hash_value
 from rest_framework.exceptions import AuthenticationFailed

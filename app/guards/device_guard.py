@@ -1,5 +1,5 @@
+from auth.actor import Actor
 from core.models import Device
-from authentication.actor import Actor
 from devkit.guard_meta import GuardMeta
 
 

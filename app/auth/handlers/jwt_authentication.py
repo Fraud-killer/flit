@@ -1,4 +1,4 @@
-from authentication.actor import Actor
+from auth.actor import Actor
 from rest_framework_simplejwt import authentication
 
 
