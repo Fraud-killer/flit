@@ -8,7 +8,7 @@ from devkit.messages import msg_uuid, msg_required, msg_dense_string
 
 def parse_register_device_inputs(id, request):
     client_id = request.data.get("client_id", undefined)
-    device_query_id = request.data.get("device_query_id", undefined)
+    visit_id = request.data.get("visit_id", undefined)
 
     errors = list()
     application = None
@@ -32,20 +32,20 @@ def parse_register_device_inputs(id, request):
             msg_dense_string.new(path="client_id")
         )
 
-    if device_query_id is undefined:
+    if visit_id is undefined:
         errors.append(
-            msg_required.new(path="device_query_id")
+            msg_required.new(path="visit_id")
         )
-    elif not is_dense_str(device_query_id):
+    elif not is_dense_str(visit_id):
         errors.append(
-            msg_dense_string.new(path="device_query_id")
+            msg_dense_string.new(path="visit_id")
         )
 
     data = None if errors else (
         Struct(
             client_id=client_id,
             application=application,
-            device_query_id=device_query_id,
+            visit_id=visit_id,
         )
     )
 

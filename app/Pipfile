@@ -4,18 +4,20 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+babel = "*"
 signit = "*"
 daphne = "*"
 django = "*"
+aiohttp = "*"
 psycopg = "*"
 requests = "*"
 str2bool = "*"
 validators = "*"
+py-moneyed = "*"
 cryptography = "*"
 dj-database-url = "*"
 djangorestframework = "*"
 djangorestframework-simplejwt = "*"
-aiohttp = "*"
 
 [dev-packages]
 

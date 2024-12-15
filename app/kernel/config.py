@@ -2,7 +2,7 @@ import json
 import dj_database_url
 from devkit import execute
 from devkit.casts import to_bool
-from devkit.messages import msg_to_bool, msg_hosts
+from devkit.messages import msg_to_bool
 from devkit.config_meta import variable, ConfigMeta, VariableError
 
 

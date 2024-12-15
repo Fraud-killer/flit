@@ -1,4 +1,4 @@
-from audit import events
+from core.audit import events
 from devkit import undefined
 from devkit.struct import Struct
 from core.models import Application
@@ -17,17 +17,15 @@ def parse_audit_inputs(id, mode, request):
     event = None
     errors = list()
     application = None
+    is_valid_mode = mode in modes_dict
 
-    if mode not in modes_dict:
+    if not is_valid_mode:
         errors.append(
             msg_in_choices.new(
                 path="mode",
                 context=dict(choices=list(modes_dict)),
             )
         )
-    else:
-        event = modes_dict[mode](**request.data)
-        errors.extend(event.verify())
 
     if not is_uuid_str(id):
         errors.append(
@@ -38,6 +36,10 @@ def parse_audit_inputs(id, mode, request):
 
         if not application:
             errors.append(msg_app_ref_exist.new(path="id"))
+
+    if is_valid_mode and application:
+        event = modes_dict[mode](**request.data)
+        errors.extend(event.verify(application.policy))
 
     data = None if errors else (
         Struct(

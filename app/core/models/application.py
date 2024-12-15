@@ -1,7 +1,6 @@
 from uuid import uuid4
-from devkit import execute
+from core import mcrypt
 from django.db import models
-from kernel.mcrypt import decrypt
 
 from .organization import Organization
 
@@ -10,7 +9,7 @@ class Application(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     name = models.CharField(max_length=80)
     secret_key = models.CharField(max_length=512, null=True, blank=True)
-    device_sdk_key = models.CharField(max_length=512, null=True, blank=True)
+    visit_sdk_key = models.CharField(max_length=512, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -21,8 +20,8 @@ class Application(models.Model):
 
     @property
     def raw_secret_key(self):
-        return decrypt(self.secret_key)
+        return mcrypt.decrypt(self.secret_key)
 
     @property
-    def raw_device_sdk_key(self):
-        return decrypt(self.device_sdk_key)
+    def raw_visit_sdk_key(self):
+        return mcrypt.decrypt(self.visit_sdk_key)

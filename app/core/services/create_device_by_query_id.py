@@ -1,5 +1,5 @@
 from core.models import Device
-from services.fingerprint import FetchVisitData
+from core.services.fingerprint import FetchVisitData
 
 
 class QueryIdDeviceNotFound(Exception):

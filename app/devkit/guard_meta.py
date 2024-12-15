@@ -16,16 +16,16 @@ class GuardMeta(type):
         error_messages = list()
 
         if list(set(options) - {"actor_type", "resource_type"}):
-            error_messages.append("The permitted options are actor_type and resource_type")
+            error_messages.append("Permitted options are actor_type and resource_type")
  
         if not isinstance(options.get("resource_type"), type):
-            error_messages.append("The resource type must be a native type object")
+            error_messages.append("Resource type must be a native type object")
 
         if not isinstance(options.get("actor_type"), type):
-            error_messages.append("The actor type must be a native type object")
+            error_messages.append("Actor type must be a native type object")
 
         if "__init__" in attrs:
-            error_messages.append("The initializer method is not supported")
+            error_messages.append("Initializer method is not supported")
 
         if error_messages: raise GuardError(f"{name}: {error_messages}")
 

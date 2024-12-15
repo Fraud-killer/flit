@@ -1,6 +1,6 @@
 import signit
-from kernel import mcrypt
-from auth.actor import Actor
+from core import mcrypt
+from core.auth.actor import Actor
 from core.models import Application
 from devkit.checks import is_uuid_str
 from devkit import execute, create_hash_value
@@ -12,12 +12,12 @@ class HmacAuthentication(BaseAuthentication):
     def authenticate_header(self, request):
         return "HMAC realm='api'"
 
-    def prepare_application(self, client_id):
-        if not is_uuid_str(client_id):
+    def prepare_application(self, public_key):
+        if not is_uuid_str(public_key):
             return None
 
         application = Application.objects.filter(
-            id=client_id
+            id=public_key
         ).first()
 
         if not application: return None
@@ -41,15 +41,14 @@ class HmacAuthentication(BaseAuthentication):
         if error or len(result) != 3:
             raise AuthenticationFailed("Invalid signature format")
 
-        client_id, message_hash = result[1:]
+        public_key, signed_message_hash = result[1:]
 
-        request_hash = create_hash_value(
+        message_hash = create_hash_value(
             dict(
                 path=request.path.lower(),
                 method=request.method.lower(),
                 body_hash=create_hash_value(request.data),
                 timestamp=request.headers.get("X-Timestamp"),
-                client_id=request.headers.get("X-Client-Id"),
                 content_type=request.headers.get("Content-Type"),
             )
         )
@@ -57,18 +56,20 @@ class HmacAuthentication(BaseAuthentication):
         actor = None
 
         for prepare in [self.prepare_application]:
-            result = prepare(client_id)
+            prepared = prepare(public_key)
 
-            if result is not None:
+            if prepared is not None:
+                secret_key = prepared[1]
+
                 if signit.signature.verify(
+                    signed_message_hash,
+                    secret_key,
                     message_hash,
-                    result[1],
-                    request_hash,
                 ):
-                    actor = result[0]
+                    actor = prepared[0]
 
                 break  # Redundant to continue iteration
-        
+
         if actor: return (None, actor)
 
         raise AuthenticationFailed("Invalid credentials")

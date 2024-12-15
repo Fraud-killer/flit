@@ -27,7 +27,7 @@ STATIC_ROOT = BASE_DIR / "static"
 
 ALLOWED_HOSTS = Config.allowed_hosts
 
-WSGI_APPLICATION = "kernel.wsgi.application"
+ASGI_APPLICATION = "kernel.asgi.application"
 
 DATABASES = dict(default=Config.database_options)
 
@@ -38,6 +38,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
+    "daphne",
     "django.contrib.staticfiles",
     "django.contrib.sessions",
     "django.contrib.messages",
@@ -67,8 +68,8 @@ SIMPLE_JWT = {
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "auth.handlers.JwtAuthentication",
-        "auth.handlers.HmacAuthentication",
+        "core.auth.handlers.JwtAuthentication",
+        "core.auth.handlers.HmacAuthentication",
     ],
     'EXCEPTION_HANDLER': 'api.exceptions.handle_exception',
 }

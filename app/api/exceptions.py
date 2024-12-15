@@ -11,7 +11,7 @@ def handle_permission_denied():
     return build_api_response(
         errors=[
             Message(
-                code="action_forbidden",
+                code="forbidden",
                 text="Not allowed to perform this action",
             )
         ],
@@ -40,12 +40,20 @@ def handle_authentication_failed(exception):
     )
 
 
-def handle_not_authenticated():
+def handle_not_authenticated(exception):
+    payload = json.loads(json.dumps(exception.detail))
+
+    context = (
+        payload if isinstance(payload, dict)
+        else dict(message=payload)
+    )
+
     return build_api_response(
         errors=[
             Message(
-                code="auth_required",
-                text="Must authenticate to perform this action",
+                code="unauthenticated",
+                context=dict(context=context),
+                text="Must be authenticated to perform this action",
             )
         ],
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -55,7 +63,7 @@ def handle_not_authenticated():
 
 def handle_exception(exception, context):
     if isinstance(exception, NotAuthenticated):
-        return handle_not_authenticated()
+        return handle_not_authenticated(exception)
 
     if (
         isinstance(exception, PermissionDenied)

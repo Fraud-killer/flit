@@ -3,13 +3,17 @@ import json
 from uuid import UUID
 from datetime import date, datetime
 
-from . import execute
 from .casts import to_bool
+from . import execute, undefined
 
 
 var_regex = r"(?:[a-z_][a-z0-9_]*)"
 key_regex = fr"(?:(?:\d+)|{var_regex})"
 path_regex = fr"(?:(?:{key_regex}\.)*{key_regex})"
+
+
+def is_present(value):
+    return value not in (None, undefined)
 
 
 def is_array(value):

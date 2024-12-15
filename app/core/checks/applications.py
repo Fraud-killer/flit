@@ -1,6 +1,6 @@
+from core import mcrypt
 from devkit import execute
 from django.db.models import Q
-from kernel.mcrypt import decrypt
 from devkit.checks import is_dense_str, is_trimmed_str
 
 
@@ -9,11 +9,11 @@ def is_app_secret_key(value):
 
 
 def is_app_enc_secret_key(value):
-    value, error = execute(decrypt, value)
+    value, error = execute(mcrypt.decrypt, value)
     return not error and is_app_secret_key(value)
 
 
-def is_app_device_sdk_key(data):
+def is_app_visit_sdk_key(data):
     return (
         isinstance(data, dict)
         and set(data.keys()) == {
@@ -27,9 +27,9 @@ def is_app_device_sdk_key(data):
     )
 
 
-def is_app_enc_device_sdk_key(value):
-    data, error = execute(decrypt, value)
-    return not error and is_app_device_sdk_key(data)
+def is_app_enc_visit_sdk_key(value):
+    data, error = execute(mcrypt.decrypt, value)
+    return not error and is_app_visit_sdk_key(data)
 
 
 def app_has_policy(app_id, ignore_policy_id=None):

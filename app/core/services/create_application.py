@@ -1,8 +1,8 @@
 from os import urandom
-from kernel.mcrypt import encrypt
+from core import mcrypt
 from core.models import Application
-from services.fingerprint import CreatePublicKey
-from core.checks.applications import is_app_device_sdk_key
+from core.services.fingerprint import CreatePublicKey
+from core.checks.applications import is_app_visit_sdk_key
 
 
 class InvalidAppDeviceSdkKey(Exception):
@@ -17,18 +17,18 @@ class CreateApplication:
         application = Application(
             name=name,
             organization=organization,
-            secret_key=encrypt(secret_key),
+            secret_key=mcrypt.encrypt(secret_key),
         )
 
         application.full_clean()
 
         public_key = CreatePublicKey.call(application.name)
-        device_sdk_key = dict(public_key)
+        visit_sdk_key = dict(public_key)
 
-        if not is_app_device_sdk_key(device_sdk_key):
-            raise InvalidAppDeviceSdkKey(device_sdk_key)
+        if not is_app_visit_sdk_key(visit_sdk_key):
+            raise InvalidAppDeviceSdkKey(visit_sdk_key)
 
-        application.device_sdk_key = encrypt(device_sdk_key)
+        application.visit_sdk_key = mcrypt.encrypt(visit_sdk_key)
 
         application.save()
 

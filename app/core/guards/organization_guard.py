@@ -1,4 +1,4 @@
-from auth.actor import Actor
+from core.auth.actor import Actor
 from core.models import Organization
 from devkit.guard_meta import GuardMeta
 
