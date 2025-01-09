@@ -12,7 +12,7 @@ class InvalidAppDeviceSdkKey(Exception):
 class CreateApplication:
     @classmethod
     def call(cls, *, name, organization):
-        secret_key = str(urandom(30).hex())
+        secret_key = str(urandom(20).hex())
 
         application = Application(
             name=name,

@@ -5,7 +5,7 @@ from devkit.checks import is_dense_str, is_trimmed_str
 
 
 def is_app_secret_key(value):
-    return is_dense_str(value) and len(value) == 30
+    return is_dense_str(value) and len(value) == 20
 
 
 def is_app_enc_secret_key(value):
