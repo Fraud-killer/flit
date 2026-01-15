@@ -18,8 +18,17 @@ cryptography = "*"
 dj-database-url = "*"
 djangorestframework = "*"
 djangorestframework-simplejwt = "*"
+channels = "*"
+channels-redis = "*"
+redis = "*"
 
 [dev-packages]
+pytest = "*"
+pytest-django = "*"
+pytest-asyncio = "*"
+locust = "*"
+aiohttp = "*"
+coverage = "*"
 
 [requires]
-python_version = "3.12"
+python_version = "3.11"

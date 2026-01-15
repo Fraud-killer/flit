@@ -1,5 +1,74 @@
+# IDE
 .vscode
-.DS_Store
+.idea
+*.swp
+*.swo
 
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# Testing
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
+
+# Environments
+.env
+.env.local
+.env.*.local
+*.env
+
+# Temporary files
 /**/tmp/**/*
 !/**/tmp/.gitkeep
+*.log
+*.tmp
+
+# Sensitive data - DO NOT COMMIT
+*.json
+!package.json
+!package-lock.json
+secrets/
+credentials/
+
+# Database
+*.sqlite3
+*.db
+
+# Pipenv
+Pipfile.lock
