@@ -55,3 +55,11 @@ class Config(metaclass=ConfigMeta):
     @variable
     def fingerprint_management_api_key(self, ctx):
         return ctx.load.env("FINGERPRINT_MANAGEMENT_API_KEY")
+
+    @variable
+    def redis_url(self, ctx):
+        return ctx.load.env("REDIS_URL", "redis://localhost:6379/0")
+
+    @variable
+    def cache_url(self, ctx):
+        return ctx.load.env("CACHE_URL", "redis://localhost:6379/1")
