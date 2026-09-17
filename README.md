@@ -148,8 +148,27 @@ The API will be available at `http://localhost:18000`
 | `CACHE_URL` | Redis URL for caching | `redis://localhost:6379/1` |
 | `SECRET_KEY` | Django secret key | Required |
 | `MCRYPT_KEY` | Encryption key for secrets | Required |
-| `FINGERPRINT_SERVER_API_KEY` | Fingerprint.js API key | Required |
+| `FINGERPRINT_SERVER_API_KEY` | Fingerprint server API key (device identification and Smart Signals) | Required for device rules |
+| `ALLOWED_HOSTS` | JSON array of allowed hosts | `["localhost", "127.0.0.1"]` in debug, `[]` otherwise |
+| `SECURE_SSL_REDIRECT` | Redirect HTTP to HTTPS when not in debug | `true` |
+| `GEOIP_DB_PATH` | Directory containing `GeoLite2-ASN.mmdb` and `GeoLite2-Country.mmdb` | Unset (geolocation disabled) |
+| `THREAT_LIST_URL` | Plain-text IP/CIDR blocklist | FireHOL level1 |
 | `DEBUG` | Enable debug mode | `false` |
+
+Copy `.env.example` to `.env` for local development; `docker-compose.yml` reads secrets from it.
+
+### IP Intelligence Data
+
+`IPReputationRule` combines three local sources with Fingerprint Smart Signals:
+
+- **GeoIP**: download the free [MaxMind GeoLite2](https://dev.maxmind.com/geoip/geolite2-free-geolocation-data) ASN and Country databases and point `GEOIP_DB_PATH` at their directory. Lookups are local, so they add no network latency.
+- **Tor exit nodes** and **IP blocklist**: stored in the shared cache (Redis) and refreshed by a management command. Schedule it, for example hourly via cron:
+
+```bash
+python manage.py refresh_threat_intel
+```
+
+Without these sources the rule still runs, falling back to coarse cloud-provider IP ranges and Fingerprint signals.
 
 ## API Usage
 
@@ -162,14 +181,20 @@ curl -X POST http://localhost:18000/api/v1/applications/{app_id}/audit-transacti
   -H "X-Timestamp: $(date +%s)" \
   -H "X-Nonce: $(uuidgen)" \
   -d '{
+    "id": "txn_123",
+    "type": "debit",
     "client_id": "user_123",
-    "device_fingerprint": "fp_abc123",
-    "amount": "1000.00",
+    "visit_id": "fingerprint_request_id",
+    "amount": 1000.00,
     "currency_code": "USD",
-    "latitude": 40.7128,
-    "longitude": -74.0060
+    "ip_address": "81.2.69.160",
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"
   }'
 ```
+
+`ip_address` and `user_agent` are the **end user's** values. FLIT receives the request from your server, so it cannot see them itself. When omitted, the IP and user agent Fingerprint recorded for `visit_id` are used.
+
+Payment rules also read optional payment fields when you send them: `status`, `gateway_message`, `provider_responses`, `card_fingerprint`, `card_bin`, `payment_instrument`, `browser_details`, `billing` and `shipping`.
 
 ### Response
 
@@ -251,7 +276,20 @@ ws.onmessage = (event) => {
 | `PaymentFraudRule` | Automated clients, headless browsers, bot detection | 0.95 |
 | `GatewayPatternRule` | Issuer fraud flags, decline pattern analysis | 0.85 |
 | `CardTestingRule` | Small transactions, high failure rates, BIN enumeration | 0.9 |
-| `IPConcentrationRule` | Datacenter IPs, multiple cards/customers per IP | 0.8 |
+| `IPConcentrationRule` | Transaction velocity and multiple cards/customers per IP | 0.8 |
+| `ThreeDSTimeoutRule` | 3DS challenge timeouts (bots cannot complete them) | 0.85 |
+| `FakeAddressRule` | Known fake/test addresses, duplicate lines, impossible geography | 0.7 |
+| `RetryAttackRule` | Rapid card retries and card cycling | 0.9 |
+| `IssuerSignalRule` | Issuer fraud, velocity and card-issue decline signals | 0.85 |
+
+Payment rules attach a per-signal score to each finding; it is used as the weight when no explicit weight is configured.
+
+### IP & Bot Intelligence Rules
+
+| Rule | Description | Risk Weight |
+|------|-------------|-------------|
+| `IPReputationRule` | Tor exit nodes, blocklisted, proxy, VPN, datacenter and high-risk-country IPs | 0.3 – 0.9 |
+| `BotSignalRule` | Automated user agents and Fingerprint bad-bot detection (search crawlers allowed) | 0.7 |
 
 ## Risk Levels
 

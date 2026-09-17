@@ -52,7 +52,7 @@ When deploying FLIT:
 
 1. **Use strong secrets**
    - `SECRET_KEY`: Minimum 50 characters, randomly generated
-   - `MCRYPT_KEY`: Exactly 32 characters, randomly generated
+   - `MCRYPT_KEY`: A Fernet key from `Fernet.generate_key()` (44 base64 characters)
 
 2. **Enable HTTPS**
    - Always use TLS in production

@@ -94,7 +94,8 @@ class RiskEngine:
 
         for msg in rule_messages:
             code = msg.get("code", "unknown")
-            weight = self.weights.get_weight(code)
+            context = msg.get("context") or {}
+            weight = self.weights.get_weight(code, default=context.get("score"))
 
             base_score = 1.0
 

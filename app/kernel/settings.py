@@ -64,8 +64,7 @@ MIDDLEWARE = [
 
 SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
 }
 
@@ -73,6 +72,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "core.auth.handlers.JwtAuthentication",
         "core.auth.handlers.HmacAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "api.permissions.HasAuthenticated",
     ],
     'EXCEPTION_HANDLER': 'api.exceptions.handle_exception',
 }
@@ -92,6 +94,15 @@ TEMPLATES = [
         },
     },
 ]
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = Config.secure_ssl_redirect
+    SECURE_REDIRECT_EXEMPT = [r"^health/"]
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
 
 if DEBUG:
     CHANNEL_LAYERS = {

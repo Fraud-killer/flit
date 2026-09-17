@@ -7,10 +7,10 @@ brute-force attacks on payment systems.
 
 from typing import Any
 from datetime import datetime, timedelta
-from .base_rule import BaseRule
+from .payment_rule import PaymentRule
 
 
-class RetryAttackRule(BaseRule):
+class RetryAttackRule(PaymentRule):
     """
     Detects retry attack patterns commonly used in card testing.
     
@@ -21,6 +21,8 @@ class RetryAttackRule(BaseRule):
     - Exponential retry patterns (automated)
     """
     
+    trigger_fields = ("payment_instrument",)
+
     name = "Retry Attack Detection"
     weight = 0.9
     
@@ -36,7 +38,7 @@ class RetryAttackRule(BaseRule):
     WINDOW_5MIN = 300
     WINDOW_1HOUR = 3600
     
-    async def apply(self, event: dict[str, Any], policy: dict[str, Any]) -> None:
+    async def analyze(self, event: dict[str, Any]) -> None:
         """Check for retry attack patterns."""
         
         card_hash = self._get_card_hash(event)
@@ -95,19 +97,22 @@ class RetryAttackRule(BaseRule):
             self.add_message(
                 f"Card retried {len(retries_1min)} times in 1 minute - "
                 f"likely automated attack",
-                severity="critical"
+                severity="critical",
+                code="card_retry_per_minute"
             )
         elif len(retries_5min) >= self.MAX_RETRIES_PER_CARD_5MIN:
             self.add_message(
                 f"Card retried {len(retries_5min)} times in 5 minutes - "
                 f"suspicious retry pattern",
-                severity="high"
+                severity="high",
+                code="card_retry_per_5_minutes"
             )
         elif len(retries_1hour) >= self.MAX_RETRIES_PER_CARD_1HOUR:
             self.add_message(
                 f"Card retried {len(retries_1hour)} times in 1 hour - "
                 f"excessive retries",
-                severity="medium"
+                severity="medium",
+                code="card_retry_per_hour"
             )
         
         # Update cache with new retry
@@ -135,7 +140,8 @@ class RetryAttackRule(BaseRule):
             self.add_message(
                 f"Customer used {len(cards_used)} different cards in 1 hour - "
                 f"possible card testing",
-                severity="high"
+                severity="high",
+                code="customer_card_cycling"
             )
         
         cache.set(cache_key, cards_used, timeout=self.WINDOW_1HOUR)
@@ -159,7 +165,8 @@ class RetryAttackRule(BaseRule):
             self.add_message(
                 f"IP {ip_address} used {len(cards_used)} different cards in 1 hour - "
                 f"likely card testing operation",
-                severity="critical"
+                severity="critical",
+                code="ip_card_cycling"
             )
         
         cache.set(cache_key, cards_used, timeout=self.WINDOW_1HOUR)
@@ -180,5 +187,6 @@ class RetryAttackRule(BaseRule):
             self.add_message(
                 f"Retry after {failures} consecutive failures - "
                 f"persistent attack pattern",
-                severity="high"
+                severity="high",
+                code="retry_after_failures"
             )

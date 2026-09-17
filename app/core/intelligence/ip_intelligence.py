@@ -1,8 +1,15 @@
-import re
+import bisect
 import logging
-from typing import Any, Dict, List, Optional, Set
+import ipaddress
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 from dataclasses import dataclass, field
+from uuid import uuid4
+
+import requests
 from django.core.cache import cache
+
+from kernel.config import Config
 
 
 logger = logging.getLogger(__name__)
@@ -42,9 +49,159 @@ class IPRiskInfo:
         }
 
 
+class IPRangeSet:
+    """IPs and CIDR ranges merged into sorted disjoint intervals for bisect lookup."""
+
+    def __init__(self, entries: Iterable[str]):
+        intervals = []
+        for entry in entries:
+            try:
+                network = ipaddress.ip_network(entry.strip(), strict=False)
+            except ValueError:
+                continue
+            intervals.append((
+                network.version,
+                int(network.network_address),
+                int(network.broadcast_address),
+            ))
+        intervals.sort()
+
+        merged: List[Tuple[int, int, int]] = []
+        for version, start, end in intervals:
+            if merged and merged[-1][0] == version and start <= merged[-1][2] + 1:
+                last = merged[-1]
+                merged[-1] = (version, last[1], max(last[2], end))
+            else:
+                merged.append((version, start, end))
+
+        self.intervals = merged
+        self.starts = [(version, start) for version, start, _ in merged]
+
+    def __len__(self):
+        return len(self.intervals)
+
+    def __contains__(self, ip_address: str) -> bool:
+        try:
+            ip = ipaddress.ip_address(ip_address)
+        except ValueError:
+            return False
+
+        index = bisect.bisect_right(self.starts, (ip.version, int(ip))) - 1
+        if index < 0:
+            return False
+
+        version, start, end = self.intervals[index]
+        return version == ip.version and start <= int(ip) <= end
+
+
+class SharedIPList:
+    """
+    An IP/CIDR list stored in the Django cache (Redis in production) so every
+    worker sees the same data, with a per-process parsed copy that is only
+    reloaded when the list's version stamp changes.
+    """
+
+    TIMEOUT_SECONDS = 7 * 24 * 3600
+
+    def __init__(self, name: str):
+        self.data_key = f"ip_intel:{name}:entries"
+        self.version_key = f"ip_intel:{name}:version"
+        self._version = None
+        self._ranges = IPRangeSet([])
+
+    def store(self, entries: List[str]) -> None:
+        version = uuid4().hex
+        cache.set(self.data_key, entries, timeout=self.TIMEOUT_SECONDS)
+        cache.set(self.version_key, version, timeout=self.TIMEOUT_SECONDS)
+
+    def current(self) -> IPRangeSet:
+        version = cache.get(self.version_key)
+        if version != self._version:
+            self._ranges = IPRangeSet(cache.get(self.data_key) or [])
+            self._version = version
+        return self._ranges
+
+    def __contains__(self, ip_address: str) -> bool:
+        return ip_address in self.current()
+
+
+class GeoIPDatabase:
+    """Lazy MaxMind GeoLite2 readers; lookups are local, no network calls."""
+
+    ASN_FILE = "GeoLite2-ASN.mmdb"
+    COUNTRY_FILE = "GeoLite2-Country.mmdb"
+
+    _readers = None
+    _warned = False
+
+    @classmethod
+    def readers(cls):
+        if cls._readers is None:
+            cls._readers = cls._open_readers()
+        return cls._readers
+
+    @classmethod
+    def _open_readers(cls):
+        db_path = Config.geoip_db_path
+        if not db_path:
+            cls._warn("GEOIP_DB_PATH is not set; IP geolocation is disabled")
+            return {}
+
+        try:
+            import geoip2.database
+        except ImportError:
+            cls._warn("geoip2 is not installed; IP geolocation is disabled")
+            return {}
+
+        readers = {}
+        for name, filename in (("asn", cls.ASN_FILE), ("country", cls.COUNTRY_FILE)):
+            path = Path(db_path) / filename
+            if path.exists():
+                readers[name] = geoip2.database.Reader(str(path))
+            else:
+                cls._warn(f"GeoIP database not found: {path}")
+        return readers
+
+    @classmethod
+    def _warn(cls, message):
+        if not cls._warned:
+            logger.warning(message)
+            cls._warned = True
+
+    @classmethod
+    def lookup(cls, ip_address: str) -> Optional[Dict[str, Any]]:
+        readers = cls.readers()
+        if not readers:
+            return None
+
+        data = {}
+
+        if "asn" in readers:
+            try:
+                response = readers["asn"].asn(ip_address)
+                if response.autonomous_system_number:
+                    data["asn"] = f"AS{response.autonomous_system_number}"
+                data["asn_org"] = response.autonomous_system_organization
+                data["isp"] = response.autonomous_system_organization
+            except Exception:
+                pass
+
+        if "country" in readers:
+            try:
+                response = readers["country"].country(ip_address)
+                data["country_code"] = response.country.iso_code
+            except Exception:
+                pass
+
+        return data or None
+
+
 class IPIntelligence:
     CACHE_TTL_SECONDS = 3600
-    
+    REQUEST_TIMEOUT_SECONDS = 30
+
+    TOR_EXIT_LIST_URL = "https://check.torproject.org/torbulkexitlist"
+
     KNOWN_DATACENTER_ASNS = {
         "AS14061",  # DigitalOcean
         "AS16509",  # Amazon AWS
@@ -59,6 +216,18 @@ class IPIntelligence:
         "AS46606",  # Unified Layer
         "AS36352",  # ColoCrossing
     }
+
+    # Coarse cloud ranges, used only when no GeoIP ASN data is available.
+    FALLBACK_DATACENTER_RANGES = IPRangeSet([
+        "52.0.0.0/11",      # AWS US East
+        "54.0.0.0/8",       # AWS Global
+        "99.80.0.0/12",     # AWS EU
+        "35.0.0.0/8",       # GCP
+        "104.196.0.0/14",   # GCP
+        "13.0.0.0/8",       # Azure
+        "20.0.0.0/8",       # Azure
+        "40.0.0.0/8",       # Azure
+    ])
 
     DATACENTER_ISP_KEYWORDS = [
         "amazon", "aws", "google", "microsoft", "azure", "digitalocean",
@@ -75,7 +244,8 @@ class IPIntelligence:
 
     HIGH_RISK_COUNTRIES = {"KP", "IR", "SY", "CU", "RU", "BY"}
 
-    TOR_EXIT_NODES: Set[str] = set()
+    TOR_EXIT_NODES = SharedIPList("tor_exit_nodes")
+    THREAT_LIST = SharedIPList("threat_list")
 
     @classmethod
     def get_cache_key(cls, ip_address: str) -> str:
@@ -146,6 +316,11 @@ class IPIntelligence:
                         risk_factors.append("vpn_detected")
                         break
 
+        if not info.asn and ip_address in cls.FALLBACK_DATACENTER_RANGES:
+            info.is_datacenter = True
+            info.risk_score += 0.3
+            risk_factors.append("datacenter_ip")
+
         info.is_known_attacker = await cls._check_threat_lists(ip_address)
         if info.is_known_attacker:
             info.risk_score += 0.9
@@ -158,45 +333,42 @@ class IPIntelligence:
 
     @classmethod
     def _is_private_ip(cls, ip_address: str) -> bool:
-        private_patterns = [
-            r"^10\.",
-            r"^172\.(1[6-9]|2[0-9]|3[0-1])\.",
-            r"^192\.168\.",
-            r"^127\.",
-            r"^169\.254\.",
-            r"^::1$",
-            r"^fc00:",
-            r"^fe80:",
-        ]
-        return any(re.match(pattern, ip_address) for pattern in private_patterns)
+        try:
+            return not ipaddress.ip_address(ip_address).is_global
+        except ValueError:
+            return True
 
     @classmethod
     async def _get_geo_data(cls, ip_address: str) -> Optional[Dict[str, Any]]:
-        return None
+        return GeoIPDatabase.lookup(ip_address)
 
     @classmethod
     async def _check_threat_lists(cls, ip_address: str) -> bool:
-        return False
+        return ip_address in cls.THREAT_LIST
 
     @classmethod
-    async def refresh_tor_exit_nodes(cls) -> None:
-        try:
-            import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    "https://check.torproject.org/torbulkexitlist",
-                    timeout=aiohttp.ClientTimeout(total=30),
-                ) as response:
-                    if response.status == 200:
-                        text = await response.text()
-                        cls.TOR_EXIT_NODES = set(
-                            line.strip()
-                            for line in text.split("\n")
-                            if line.strip() and not line.startswith("#")
-                        )
-                        logger.info(f"Loaded {len(cls.TOR_EXIT_NODES)} Tor exit nodes")
-        except Exception as e:
-            logger.error(f"Failed to refresh Tor exit nodes: {e}")
+    def refresh_tor_exit_nodes(cls) -> int:
+        entries = cls._download_list(cls.TOR_EXIT_LIST_URL)
+        cls.TOR_EXIT_NODES.store(entries)
+        logger.info(f"Loaded {len(entries)} Tor exit nodes")
+        return len(entries)
+
+    @classmethod
+    def refresh_threat_list(cls, url: Optional[str] = None) -> int:
+        entries = cls._download_list(url or Config.threat_list_url)
+        cls.THREAT_LIST.store(entries)
+        logger.info(f"Loaded {len(entries)} threat list entries")
+        return len(entries)
+
+    @classmethod
+    def _download_list(cls, url: str) -> List[str]:
+        response = requests.get(url, timeout=cls.REQUEST_TIMEOUT_SECONDS)
+        response.raise_for_status()
+        return [
+            line.strip()
+            for line in response.text.splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
 
     @classmethod
     def is_suspicious(cls, info: IPRiskInfo, threshold: float = 0.5) -> bool:

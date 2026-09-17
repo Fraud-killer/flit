@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Optional
 
 
 @dataclass
@@ -18,6 +18,13 @@ class RiskWeights:
     multiple_devices: float = 0.5
     multiple_ips: float = 0.4
     high_failure_rate: float = 0.6
+    tor_exit_node: float = 0.8
+    known_attacker: float = 0.9
+    proxy_detected: float = 0.5
+    vpn_detected: float = 0.4
+    datacenter_ip: float = 0.3
+    high_risk_country: float = 0.5
+    bot_detected: float = 0.7
 
     category_multipliers: Dict[str, float] = field(default_factory=lambda: {
         "transaction": 1.0,
@@ -29,7 +36,14 @@ class RiskWeights:
     time_decay_hours: float = 24.0
     recency_boost: float = 1.2
 
-    def get_weight(self, rule_code: str) -> float:
+    def get_weight(self, rule_code: str, default: Optional[float] = None) -> float:
+        """
+        Weight for a rule code. Codes without a configured weight fall back to
+        `default` (the score a rule attached to its message), then to 0.5.
+        """
+        if rule_code.startswith("bot_detected:"):
+            return self.bot_detected
+
         weight_map = {
             "device_expired": self.device_expired,
             "new_device_country": self.new_device_country,
@@ -48,8 +62,16 @@ class RiskWeights:
             "multiple_devices_detected": self.multiple_devices,
             "multiple_ips_detected": self.multiple_ips,
             "high_failure_rate": self.high_failure_rate,
+            "tor_exit_node": self.tor_exit_node,
+            "known_attacker": self.known_attacker,
+            "proxy_detected": self.proxy_detected,
+            "vpn_detected": self.vpn_detected,
+            "datacenter_ip": self.datacenter_ip,
+            "high_risk_country": self.high_risk_country,
         }
-        return weight_map.get(rule_code, 0.5)
+        if rule_code in weight_map:
+            return weight_map[rule_code]
+        return 0.5 if default is None else default
 
 
 DEFAULT_WEIGHTS = RiskWeights()

@@ -30,15 +30,14 @@ services:
     volumes:
       - ./app:/app
       - ./tmp/dev:/tmp/dev
+    # Secrets (SECRET_KEY, MCRYPT_KEY, FINGERPRINT_*) come from .env.
+    # Copy .env.example to .env and fill it in; never commit real values.
+    env_file: .env
     environment:
       DEBUG: true
       DATABASE_URL: postgres://postgres@db:5432/app-db
       REDIS_URL: redis://redis:6379/0
       CACHE_URL: redis://redis:6379/1
-      FINGERPRINT_SERVER_API_KEY: eJX9OrOWbZd9bVeHcVUg
-      FINGERPRINT_MANAGEMENT_API_KEY: 0dtjWWgEGQzHOiEr3C32
-      MCRYPT_KEY: kTMwZPVNixtc_nI4sqJcV4sybRlQZFb6P7LWE_ZNR6g=
-      SECRET_KEY: local!@pj#0nr%=a4znu#_6%7s89(43h+iv5#2@1%1-!e@6w)2
     depends_on:
       - db
       - redis
