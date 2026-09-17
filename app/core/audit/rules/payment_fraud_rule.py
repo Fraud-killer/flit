@@ -18,7 +18,7 @@ from collections import defaultdict
 
 from django.core.cache import cache
 
-from core.audit.rules.base_rule import BaseRule
+from core.audit.rules.payment_rule import PaymentRule
 
 
 @dataclass
@@ -31,7 +31,7 @@ class PaymentFraudSignal:
     details: Dict[str, Any]
 
 
-class PaymentFraudRule(BaseRule):
+class PaymentFraudRule(PaymentRule):
     """
     Detects payment fraud patterns based on real-world attack data.
     
@@ -100,7 +100,27 @@ class PaymentFraudRule(BaseRule):
     CACHE_PREFIX = "payment_fraud:"
     CACHE_TTL = 86400  # 24 hours
 
-    async def execute(self, event: Dict[str, Any]) -> Dict[str, Any]:
+    trigger_fields = (
+        "browser_details",
+        "card_fingerprint",
+        "gateway_message",
+        "billing",
+    )
+
+    async def perform(self):
+        result = await self.analyze(self.payload)
+        return [
+            self.signal(
+                s["code"],
+                s["message"],
+                s["score"],
+                severity=s["severity"].lower(),
+                details=s["details"],
+            )
+            for s in result["signals"]
+        ]
+
+    async def analyze(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """Execute payment fraud detection."""
         signals: List[PaymentFraudSignal] = []
         
@@ -115,15 +135,18 @@ class PaymentFraudRule(BaseRule):
         shipping = event.get("shipping", {})
         customer_id = event.get("customer_id", "")
         
-        # Check 1: Automated client detection
-        automation_signal = self._check_automated_client(user_agent)
-        if automation_signal:
-            signals.append(automation_signal)
+        # Checks 1-3 need browser data; without it every event would
+        # look like a client with no User-Agent.
+        if browser_details:
+            # Check 1: Automated client detection
+            automation_signal = self._check_automated_client(user_agent)
+            if automation_signal:
+                signals.append(automation_signal)
 
-        # Check 2: Headless browser detection
-        headless_signal = self._check_headless_browser(browser_details)
-        if headless_signal:
-            signals.append(headless_signal)
+            # Check 2: Headless browser detection
+            headless_signal = self._check_headless_browser(browser_details)
+            if headless_signal:
+                signals.append(headless_signal)
 
         # Check 3: JavaScript disabled
         if browser_details.get("javascript_enabled") == False:

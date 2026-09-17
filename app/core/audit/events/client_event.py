@@ -9,7 +9,7 @@ from .base_event import BaseEvent
 
 
 class ClientEvent(BaseEvent):
-    attributes = ["id", "visit_id"]
+    attributes = ["id", "visit_id", "ip_address", "user_agent"]
 
     def verify(self, policy=None):
         errors = list()
@@ -23,5 +23,7 @@ class ClientEvent(BaseEvent):
         ):
             message = msg_void_or_dense_string
             errors.append(message.new(path="visit_id"))
+
+        errors.extend(self.verify_network_attrs())
 
         return errors

@@ -6,10 +6,11 @@ fraud risk, velocity limits, or other business rules being triggered.
 """
 
 from typing import Any
-from .base_rule import BaseRule
+from datetime import datetime
+from .payment_rule import PaymentRule
 
 
-class IssuerSignalRule(BaseRule):
+class IssuerSignalRule(PaymentRule):
     """
     Analyzes issuer decline signals for fraud indicators.
     
@@ -20,6 +21,8 @@ class IssuerSignalRule(BaseRule):
     - Card restrictions
     """
     
+    trigger_fields = ("gateway_message", "provider_responses")
+
     name = "Issuer Signal Detection"
     weight = 0.85
     
@@ -66,7 +69,7 @@ class IssuerSignalRule(BaseRule):
         "pin",
     ]
     
-    async def apply(self, event: dict[str, Any], policy: dict[str, Any]) -> None:
+    async def analyze(self, event: dict[str, Any]) -> None:
         """Analyze issuer signals in the transaction."""
         
         gateway_message = event.get("gateway_message", "")
@@ -99,7 +102,8 @@ class IssuerSignalRule(BaseRule):
             if signal in message_lower:
                 self.add_message(
                     f"Issuer fraud signal detected: '{message}'",
-                    severity="critical"
+                    severity="critical",
+                    code="issuer_fraud_signal"
                 )
                 return
         
@@ -108,7 +112,8 @@ class IssuerSignalRule(BaseRule):
             if signal in message_lower:
                 self.add_message(
                     f"Issuer velocity/business rules triggered: '{message}'",
-                    severity="high"
+                    severity="high",
+                    code="issuer_velocity_signal"
                 )
                 return
         
@@ -117,7 +122,8 @@ class IssuerSignalRule(BaseRule):
             if signal in message_lower:
                 self.add_message(
                     f"Card issue detected by issuer: '{message}'",
-                    severity="medium"
+                    severity="medium",
+                    code="issuer_card_issue"
                 )
                 return
         
@@ -126,7 +132,8 @@ class IssuerSignalRule(BaseRule):
             if signal in message_lower:
                 self.add_message(
                     f"Authentication issue: '{message}'",
-                    severity="medium"
+                    severity="medium",
+                    code="issuer_authentication_issue"
                 )
                 return
     
@@ -149,7 +156,7 @@ class IssuerSignalRule(BaseRule):
         # Add new signal
         signals.append({
             "message": message,
-            "timestamp": str(datetime.utcnow()) if 'datetime' in dir() else "now"
+            "timestamp": datetime.utcnow().isoformat()
         })
         
         # Keep last 10 signals
@@ -164,7 +171,8 @@ class IssuerSignalRule(BaseRule):
         if fraud_count >= 2:
             self.add_message(
                 f"Card has {fraud_count} issuer fraud flags - high risk",
-                severity="critical"
+                severity="critical",
+                code="issuer_repeated_fraud_flags"
             )
         
         cache.set(cache_key, signals, timeout=86400)  # 24 hours

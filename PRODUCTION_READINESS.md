@@ -75,14 +75,14 @@
 ```bash
 # Required
 SECRET_KEY=<strong-random-key-50+-chars>
-MCRYPT_KEY=<32-char-encryption-key>
+MCRYPT_KEY=<Fernet.generate_key() output>
 DATABASE_URL=postgres://user:pass@host:5432/flit?sslmode=require
 
 # Recommended
 REDIS_URL=redis://host:6379/0
-ALLOWED_HOSTS=api.flit.io,flit.io
+ALLOWED_HOSTS=["api.flit.io", "flit.io"]
 DEBUG=False
-FINGERPRINT_API_KEY=<your-fingerprint-api-key>
+FINGERPRINT_SERVER_API_KEY=<your-fingerprint-server-api-key>
 ```
 
 ### Security Checklist

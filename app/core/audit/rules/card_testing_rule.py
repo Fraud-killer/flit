@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from django.core.cache import cache
 
-from core.audit.rules.base_rule import BaseRule
+from core.audit.rules.payment_rule import PaymentRule
 
 
 @dataclass
@@ -25,7 +25,7 @@ class CardTestingSignal:
     details: Dict[str, Any]
 
 
-class CardTestingRule(BaseRule):
+class CardTestingRule(PaymentRule):
     """
     Detects card testing and enumeration attacks.
     
@@ -37,7 +37,8 @@ class CardTestingRule(BaseRule):
     - Rapid sequential attempts
     """
 
-    SMALL_AMOUNT_THRESHOLD = 500  # $5.00 in cents
+    # TransactionEvent.amount is in major currency units (see core.money.Money)
+    SMALL_AMOUNT_THRESHOLD = 5
     TESTING_WINDOW_MINUTES = 30
     MIN_ATTEMPTS_FOR_TESTING = 3
     HIGH_FAILURE_RATE_THRESHOLD = 0.7
@@ -45,11 +46,29 @@ class CardTestingRule(BaseRule):
     CACHE_PREFIX = "card_testing:"
     CACHE_TTL = 1800  # 30 minutes
 
-    async def execute(self, event: Dict[str, Any]) -> Dict[str, Any]:
+    trigger_fields = ("card_fingerprint", "card_bin")
+
+    async def perform(self):
+        result = await self.analyze(self.payload)
+        if not result["signals"]:
+            return []
+
+        text = result["message"]
+        return [
+            self.signal(
+                f"card_testing_{s['indicator']}",
+                text,
+                s["confidence"],
+                details=s["details"],
+            )
+            for s in result["signals"]
+        ]
+
+    async def analyze(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """Detect card testing patterns."""
         card_fingerprint = event.get("card_fingerprint", "")
         card_bin = event.get("card_bin", "")  # First 6 digits
-        amount = event.get("amount", 0)
+        amount = event.get("amount")
         status = event.get("status", "")
         ip_address = event.get("ip_address", "")
         customer_id = event.get("customer_id", "")
@@ -63,7 +82,7 @@ class CardTestingRule(BaseRule):
             await self._track_transaction(card_fingerprint, amount, status)
 
         # Check 1: Small amount pattern
-        if amount < self.SMALL_AMOUNT_THRESHOLD:
+        if amount is not None and ip_address and amount < self.SMALL_AMOUNT_THRESHOLD:
             small_tx_count = await self._count_small_transactions(ip_address)
             if small_tx_count >= self.MIN_ATTEMPTS_FOR_TESTING:
                 signals.append(CardTestingSignal(

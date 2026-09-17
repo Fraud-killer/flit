@@ -20,6 +20,7 @@ djangorestframework = "*"
 djangorestframework-simplejwt = "*"
 channels = "*"
 channels-redis = "*"
+geoip2 = "*"
 redis = "*"
 
 [dev-packages]

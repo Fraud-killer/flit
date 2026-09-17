@@ -4,6 +4,7 @@ Pytest configuration for FLIT tests.
 
 import os
 import sys
+from cryptography.fernet import Fernet
 import django
 import pytest
 
@@ -12,7 +13,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "kernel.settings")
 os.environ.setdefault("DATABASE_URL", "sqlite:///test.db")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
-os.environ.setdefault("MCRYPT_KEY", "kTMwZPVNixtc_nI4sqJcV4sybRlQZFb6P7LWE_ZNR6g=")
+os.environ.setdefault("MCRYPT_KEY", Fernet.generate_key().decode())
 os.environ.setdefault("DEBUG", "true")
 
 

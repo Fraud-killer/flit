@@ -32,6 +32,9 @@ class Auditor:
         rules.FakeAddressRule,
         rules.RetryAttackRule,
         rules.IssuerSignalRule,
+        # IP & Bot Intelligence Rules
+        rules.IPReputationRule,
+        rules.BotSignalRule,
     )
 
     @classmethod

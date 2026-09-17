@@ -7,10 +7,10 @@ complete human verification challenges.
 """
 
 from typing import Any
-from .base_rule import BaseRule
+from .payment_rule import PaymentRule
 
 
-class ThreeDSTimeoutRule(BaseRule):
+class ThreeDSTimeoutRule(PaymentRule):
     """
     Detects 3DS timeout patterns that indicate bot/automation.
     
@@ -22,6 +22,8 @@ class ThreeDSTimeoutRule(BaseRule):
     High 3DS timeout rates strongly correlate with fraud.
     """
     
+    trigger_fields = ("gateway_message", "provider_responses")
+
     name = "3DS Timeout Detection"
     weight = 0.85
     
@@ -29,7 +31,7 @@ class ThreeDSTimeoutRule(BaseRule):
     TIMEOUT_RATE_THRESHOLD = 0.3  # 30% timeout rate is suspicious
     MIN_ATTEMPTS_FOR_RATE = 3  # Need at least 3 attempts to calculate rate
     
-    async def apply(self, event: dict[str, Any], policy: dict[str, Any]) -> None:
+    async def analyze(self, event: dict[str, Any]) -> None:
         """Check for 3DS timeout patterns."""
         
         # Check current transaction for 3DS timeout
@@ -40,7 +42,8 @@ class ThreeDSTimeoutRule(BaseRule):
         if self._is_3ds_timeout(gateway_message):
             self.add_message(
                 "3DS authentication timed out - possible bot/automation",
-                severity="high"
+                severity="high",
+                code="three_ds_timeout"
             )
             return
         
@@ -53,7 +56,8 @@ class ThreeDSTimeoutRule(BaseRule):
                     if self._is_3ds_timeout(message):
                         self.add_message(
                             "3DS timeout detected in provider response",
-                            severity="high"
+                            severity="high",
+                            code="three_ds_timeout"
                         )
                         return
         
@@ -114,7 +118,8 @@ class ThreeDSTimeoutRule(BaseRule):
                 self.add_message(
                     f"Customer has {timeout_rate:.0%} 3DS timeout rate "
                     f"({timeouts}/{attempts} attempts) - likely bot",
-                    severity="high"
+                    severity="high",
+                    code="three_ds_timeout_rate_customer"
                 )
     
     async def _check_card_timeout_rate(self, card_hash: str) -> None:
@@ -132,5 +137,6 @@ class ThreeDSTimeoutRule(BaseRule):
             if timeout_rate >= self.TIMEOUT_RATE_THRESHOLD:
                 self.add_message(
                     f"Card has {timeout_rate:.0%} 3DS timeout rate - likely compromised",
-                    severity="high"
+                    severity="high",
+                    code="three_ds_timeout_rate_card"
                 )
