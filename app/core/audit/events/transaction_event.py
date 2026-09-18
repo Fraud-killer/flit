@@ -22,6 +22,8 @@ class TransactionEvent(BaseEvent):
         "visit_token",
         "kyc_level",
         "client_id",
+        "counterparty_id",
+        "account_age_days",
         "ip_address",
         "user_agent",
         "currency_code",
@@ -81,6 +83,18 @@ class TransactionEvent(BaseEvent):
             and type(self.daily_cumulative_debit_balance) not in (int, float)
         ):
             errors.append(msg_void_or_decimal.new(path="daily_cumulative_debit_balance"))
+
+        if (
+            is_present(self.counterparty_id)
+            and not is_dense_str(self.counterparty_id)
+        ):
+            errors.append(msg_void_or_dense_string.new(path="counterparty_id"))
+
+        if (
+            is_present(self.account_age_days)
+            and (type(self.account_age_days) is not int or self.account_age_days < 0)
+        ):
+            errors.append(msg_void_or_decimal.new(path="account_age_days"))
 
         errors.extend(self.verify_visit_attrs())
         errors.extend(self.verify_network_attrs())
