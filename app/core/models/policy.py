@@ -23,6 +23,8 @@ class Policy(models.Model):
     device_validity_days = models.IntegerField(default=defaults.device_validity_days)
     # Overrides for core.audit.rules.device_thresholds.DEFAULT_DEVICE_THRESHOLDS
     device_thresholds = models.JSONField(default=get_device_thresholds_default, blank=True)
+    # Overrides for core.audit.rules.mule_thresholds.DEFAULT_MULE_THRESHOLDS
+    mule_thresholds = models.JSONField(default=get_device_thresholds_default, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

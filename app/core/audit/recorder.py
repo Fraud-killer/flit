@@ -87,6 +87,8 @@ class AuditRecorder:
                 device_id=str(identity.id) if identity else None,
                 amount=cls.value(event, "amount"),
                 currency_code=cls.value(event, "currency_code"),
+                transaction_type=cls.value(event, "type"),
+                counterparty_id=cls.value(event, "counterparty_id"),
                 risk_level=risk_result.level.value,
                 recommendation=risk_result.recommendation,
                 should_block=risk_result.should_block,
