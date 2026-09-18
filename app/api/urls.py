@@ -13,6 +13,9 @@ router.trailing_slash = "/?"
 
 router.register("applications", views.ApplicationViewSet, basename="applications")
 
-version_one_routes = [path("", include(router.urls))]
+version_one_routes = [
+    path("collect", views.CollectView.as_view(), name="collect"),
+    path("", include(router.urls)),
+]
 
 urlpatterns = [path("v1/", include(version_one_routes))]

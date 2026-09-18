@@ -1,8 +1,14 @@
 from uuid import uuid4
+from secrets import token_urlsafe
 from core import mcrypt
 from django.db import models
 
 from .organization import Organization
+
+
+def generate_collect_key():
+    """Public key embedded in the browser SDK. Identifies, never authorises."""
+    return f"flit_pk_{token_urlsafe(24)}"
 
 
 class Application(models.Model):
@@ -10,6 +16,9 @@ class Application(models.Model):
     name = models.CharField(max_length=80)
     secret_key = models.CharField(max_length=512, null=True, blank=True)
     visit_sdk_key = models.CharField(max_length=512, null=True, blank=True)
+    collect_key = models.CharField(max_length=64, unique=True, default=generate_collect_key)
+    # Origins allowed to use collect_key. Empty accepts any origin.
+    collect_origins = models.JSONField(default=list, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

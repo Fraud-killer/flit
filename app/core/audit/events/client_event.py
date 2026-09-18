@@ -13,7 +13,7 @@ class ClientEvent(BaseEvent):
 
     # `action` names what happened, e.g. login, password_change, email_change,
     # phone_change or new_device_login (read by AccountTakeoverRule).
-    attributes = ["id", "visit_id", "ip_address", "user_agent", "action"]
+    attributes = ["id", "visit_id", "visit_token", "ip_address", "user_agent", "action"]
 
     def verify(self, policy=None):
         errors = list()
@@ -31,6 +31,7 @@ class ClientEvent(BaseEvent):
         if is_present(self.action) and not is_dense_str(self.action):
             errors.append(msg_void_or_dense_string.new(path="action"))
 
+        errors.extend(self.verify_visit_attrs())
         errors.extend(self.verify_network_attrs())
 
         return errors

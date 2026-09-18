@@ -1,4 +1,5 @@
 from uuid import uuid4
+from secrets import token_urlsafe
 from django.db import models
 
 from .application import Application
@@ -6,9 +7,11 @@ from .application import Application
 
 class DeviceIdentitySource:
     FINGERPRINT = "fingerprint"
+    FLIT = "flit"
 
     CHOICES = [
         (FINGERPRINT, "Fingerprint"),
+        (FLIT, "FLIT SDK"),
     ]
 
 
@@ -39,6 +42,11 @@ class DeviceIdentity(models.Model):
             ),
         ]
 
+    @staticmethod
+    def generate_external_id():
+        """The device key FLIT issues to a browser it has not seen before."""
+        return f"flit_dk_{token_urlsafe(24)}"
+
     def __str__(self): return f"DeviceIdentity ({self.source}:{self.external_id})"
 
 
@@ -67,3 +75,34 @@ class DeviceAccountLink(models.Model):
         ]
 
     def __str__(self): return f"DeviceAccountLink ({self.client_id} on {self.device_id})"
+
+
+class DeviceSignature(models.Model):
+    """
+    A hashed snapshot of the signals one device produced, used to recognise
+    the device on later visits. Only hashes are stored, never raw signals.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
+    signature_hash = models.CharField(max_length=64, db_index=True)
+    components = models.JSONField(default=dict)
+    platform = models.CharField(max_length=40, blank=True)
+    event_count = models.PositiveIntegerField(default=0)
+    first_seen_at = models.DateTimeField(auto_now_add=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    device = models.ForeignKey(DeviceIdentity, on_delete=models.CASCADE, related_name="signatures")
+    application = models.ForeignKey(Application, on_delete=models.CASCADE)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["application", "signature_hash"],
+                name="unique_device_signature_per_application",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["application", "platform", "last_seen_at"]),
+        ]
+
+    def __str__(self): return f"DeviceSignature ({self.signature_hash[:12]})"

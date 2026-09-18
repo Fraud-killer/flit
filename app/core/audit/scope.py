@@ -1,6 +1,9 @@
 from core.models import Device
+from devkit.struct import Struct
 from asgiref.sync import sync_to_async
 from core.services.fingerprint import FetchVisitData
+from core.services.collect_visit import CollectVisit
+from core.audit.collected_visit import build_collected_visit
 from core.audit.lock_cache import LockCache, lockcache
 
 
@@ -13,6 +16,12 @@ class Scope(LockCache):
         return await FetchVisitData.async_call(
             visit_id
         )
+
+    @lockcache(lambda visit_token: visit_token)
+    async def fetch_collected_visit(self, visit_token):
+        data = await sync_to_async(CollectVisit.fetch)(visit_token)
+        if data is None: return None
+        return build_collected_visit(data)
 
     @lockcache(
         lambda *, visit_id, client_id, application: (
