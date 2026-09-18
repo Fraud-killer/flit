@@ -4,6 +4,15 @@ from django.db.models import Q
 from devkit.checks import is_dense_str, is_trimmed_str
 
 
+def is_app_collect_origins(value):
+    from core.services.collect_origin import is_collect_origin
+
+    return (
+        isinstance(value, list)
+        and all(is_collect_origin(origin) for origin in value)
+    )
+
+
 def is_app_secret_key(value):
     return is_dense_str(value) and len(value) == 30
 

@@ -336,3 +336,118 @@ class TestAuditWithCollectedVisit:
         result = self.audit(application, visit_token)
 
         assert result.device_id is None
+
+
+class TestOriginAllowlist:
+    def test_matches_exact_origins_case_and_slash_insensitively(self):
+        from core.services.collect_origin import origin_matches
+
+        assert origin_matches("https://shop.example.com", "https://shop.example.com")
+        assert origin_matches("https://Shop.Example.com/", "https://shop.example.com")
+        assert origin_matches("https://shop.example.com:443", "https://shop.example.com:443")
+
+        assert not origin_matches("https://shop.example.com", "http://shop.example.com")
+        assert not origin_matches("https://shop.example.com", "https://shop.example.com:8443")
+        assert not origin_matches("https://shop.example.com", "https://evil.com")
+        assert not origin_matches("https://shop.example.com", "https://shop.example.com.evil.com")
+
+    def test_matches_subdomain_wildcards(self):
+        from core.services.collect_origin import origin_matches
+
+        assert origin_matches("https://*.example.com", "https://shop.example.com")
+        assert origin_matches("https://*.example.com", "https://a.b.example.com")
+
+        # The bare domain and look-alikes are not subdomains.
+        assert not origin_matches("https://*.example.com", "https://example.com")
+        assert not origin_matches("https://*.example.com", "https://notexample.com")
+        assert not origin_matches("https://*.example.com", "http://shop.example.com")
+
+    def test_validates_allowlist_entries(self):
+        from core.checks.applications import is_app_collect_origins
+
+        assert is_app_collect_origins([])
+        assert is_app_collect_origins(["https://shop.example.com", "https://*.example.com:8443"])
+
+        assert not is_app_collect_origins(["shop.example.com"])
+        assert not is_app_collect_origins(["https://shop.example.com/checkout"])
+        assert not is_app_collect_origins(["*"])
+        assert not is_app_collect_origins("https://shop.example.com")
+
+    def test_an_empty_allowlist_accepts_any_origin(self, application):
+        from core.services.collect_origin import is_origin_allowed
+
+        assert is_origin_allowed(application, "https://anything.example.com")
+        assert is_origin_allowed(application, None)
+
+    def test_a_configured_allowlist_rejects_other_origins(self, application):
+        from core.services.collect_origin import is_origin_allowed
+
+        application.collect_origins = ["https://shop.example.com"]
+
+        assert is_origin_allowed(application, "https://shop.example.com")
+        assert not is_origin_allowed(application, "https://evil.com")
+        # A non-browser caller sends no Origin and is not blocked by this.
+        assert is_origin_allowed(application, None)
+
+
+class TestCollectEndpointOrigins:
+    def post(self, application, origin=None):
+        from rest_framework.test import APIClient
+
+        headers = dict(HTTP_ORIGIN=origin) if origin else {}
+
+        return APIClient().post(
+            "/api/v1/collect",
+            dict(key=application.collect_key, signals=chrome_signals()),
+            format="json",
+            **headers,
+        )
+
+    def allow(self, application, origins):
+        application.collect_origins = origins
+        application.save(update_fields=["collect_origins"])
+
+    def test_reflects_the_calling_origin(self, application):
+        response = self.post(application, "https://shop.example.com")
+
+        assert response.status_code == 200
+        assert response["Access-Control-Allow-Origin"] == "https://shop.example.com"
+        assert "Origin" in response["Vary"]
+
+    def test_allows_a_listed_origin(self, application):
+        self.allow(application, ["https://*.example.com"])
+
+        response = self.post(application, "https://shop.example.com")
+
+        assert response.status_code == 200
+        assert response["Access-Control-Allow-Origin"] == "https://shop.example.com"
+
+    def test_blocks_an_unlisted_origin(self, application):
+        from core.models import DeviceIdentity
+
+        self.allow(application, ["https://shop.example.com"])
+
+        response = self.post(application, "https://evil.com")
+
+        assert response.status_code == 403
+        assert [error["code"] for error in response.data["errors"]] == ["origin_not_allowed"]
+        # The browser must not be able to read the refusal either.
+        assert "Access-Control-Allow-Origin" not in response
+        # Nothing was collected.
+        assert DeviceIdentity.objects.count() == 0
+
+    def test_allows_callers_without_an_origin(self, application):
+        self.allow(application, ["https://shop.example.com"])
+
+        assert self.post(application).status_code == 200
+
+    def test_preflight_stays_open(self, application):
+        from rest_framework.test import APIClient
+
+        self.allow(application, ["https://shop.example.com"])
+
+        response = APIClient().options("/api/v1/collect", HTTP_ORIGIN="https://evil.com")
+
+        # A preflight carries no key, so it cannot be judged; the POST is.
+        assert response.status_code == 200
+        assert response["Access-Control-Allow-Origin"] == "https://evil.com"

@@ -69,6 +69,10 @@ The first response includes a `device_key`, which the SDK stores in `localStorag
 
 It is a hint, not a credential: a copied key cannot make one device pass as another, because the signals still have to broadly agree. If storage is blocked or cleared, everything still works; identification just leans entirely on the signals.
 
+## Restricting your key
+
+The key is public, so lock it to your sites with the application's `collect_origins` allowlist (exact origins, or `https://*.example.com` for subdomains). An unlisted site gets a 403 it cannot read. An empty list accepts any origin.
+
 ## Privacy
 
 - Collection is explicit: nothing runs until you call `collect`.

@@ -17,6 +17,8 @@ class Application(models.Model):
     secret_key = models.CharField(max_length=512, null=True, blank=True)
     visit_sdk_key = models.CharField(max_length=512, null=True, blank=True)
     collect_key = models.CharField(max_length=64, unique=True, default=generate_collect_key)
+    # Origins allowed to use collect_key. Empty accepts any origin.
+    collect_origins = models.JSONField(default=list, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
