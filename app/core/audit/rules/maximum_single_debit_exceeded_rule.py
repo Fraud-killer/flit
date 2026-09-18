@@ -1,5 +1,6 @@
 from devkit.message import Message
 from core.money import Money, init_money
+from .money_limits import currency_mismatch
 from core.audit.events import TransactionEvent
 
 from .base_rule import BaseRule
@@ -34,6 +35,9 @@ class MaximumSingleDebitExceededRule(BaseRule):
             if raw_maximum_single_debit is None
             else init_money(raw_maximum_single_debit)
         )
+
+        mismatch = currency_mismatch(amount, maximum_single_debit)
+        if mismatch: return mismatch
 
         if maximum_single_debit and amount > maximum_single_debit:
             return (

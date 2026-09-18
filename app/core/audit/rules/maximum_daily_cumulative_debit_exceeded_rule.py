@@ -1,5 +1,6 @@
 from devkit.message import Message
 from core.money import Money, init_money
+from .money_limits import currency_mismatch
 from core.audit.events import TransactionEvent
 
 from .base_rule import BaseRule
@@ -42,6 +43,9 @@ class MaximumDailyCumulativeDebitExceededRule(BaseRule):
         )
 
         if not maximum_daily_cumulative_debit: return None
+
+        mismatch = currency_mismatch(amount, maximum_daily_cumulative_debit)
+        if mismatch: return mismatch
 
         new_daily_cumulative_debit_balance = amount + daily_cumulative_debit_balance
 

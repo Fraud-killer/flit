@@ -25,6 +25,21 @@ class RiskWeights:
     datacenter_ip: float = 0.3
     high_risk_country: float = 0.5
     bot_detected: float = 0.7
+    multi_accounting: float = 0.7
+    account_sharing: float = 0.5
+    concurrent_devices: float = 0.7
+    device_tampering: float = 0.8
+    virtual_machine: float = 0.5
+    emulator: float = 0.7
+    jailbroken_device: float = 0.6
+    hooking_framework: float = 0.9
+    cloned_app: float = 0.7
+    developer_tools: float = 0.3
+    location_spoofing: float = 0.8
+    remote_control: float = 0.85
+    mitm_attack: float = 0.8
+    # Data completeness, not evidence of fraud: reported, never scored.
+    req_event_attrs: float = 0.0
 
     category_multipliers: Dict[str, float] = field(default_factory=lambda: {
         "transaction": 1.0,
@@ -68,6 +83,20 @@ class RiskWeights:
             "vpn_detected": self.vpn_detected,
             "datacenter_ip": self.datacenter_ip,
             "high_risk_country": self.high_risk_country,
+            "multi_accounting": self.multi_accounting,
+            "account_sharing": self.account_sharing,
+            "concurrent_devices": self.concurrent_devices,
+            "device_tampering": self.device_tampering,
+            "virtual_machine": self.virtual_machine,
+            "emulator": self.emulator,
+            "jailbroken_device": self.jailbroken_device,
+            "hooking_framework": self.hooking_framework,
+            "cloned_app": self.cloned_app,
+            "developer_tools": self.developer_tools,
+            "location_spoofing": self.location_spoofing,
+            "remote_control": self.remote_control,
+            "mitm_attack": self.mitm_attack,
+            "req_event_attrs": self.req_event_attrs,
         }
         if rule_code in weight_map:
             return weight_map[rule_code]

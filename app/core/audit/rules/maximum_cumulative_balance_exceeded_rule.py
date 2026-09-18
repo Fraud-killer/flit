@@ -1,5 +1,6 @@
 from devkit.message import Message
 from core.money import Money, init_money
+from .money_limits import currency_mismatch
 from core.audit.events import TransactionEvent
 
 from .base_rule import BaseRule
@@ -42,6 +43,9 @@ class MaximumCumulativeBalanceExceededRule(BaseRule):
         )
 
         if not maximum_cumulative_balance: return None
+
+        mismatch = currency_mismatch(amount, maximum_cumulative_balance)
+        if mismatch: return mismatch
 
         new_current_cumulative_balance = amount + current_cumulative_balance
 

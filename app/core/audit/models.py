@@ -40,6 +40,24 @@ class AuditLogCategory:
     ]
 
 
+class AuditLogLabel:
+    """Merchant-reported ground truth for an audited event."""
+
+    FRAUD = "fraud"
+    CHARGEBACK = "chargeback"
+    LEGIT = "legit"
+    FALSE_POSITIVE = "false_positive"
+
+    CHOICES = [
+        (FRAUD, "Fraud"),
+        (CHARGEBACK, "Chargeback"),
+        (LEGIT, "Legitimate"),
+        (FALSE_POSITIVE, "False positive"),
+    ]
+
+    VALUES = [value for value, _ in CHOICES]
+
+
 class AuditLog(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
 
@@ -73,6 +91,10 @@ class AuditLog(models.Model):
     error_code = models.CharField(max_length=50, null=True, blank=True)
     error_message = models.TextField(null=True, blank=True)
 
+    # Labels arrive after the event, so they stay out of the hash chain.
+    label = models.CharField(max_length=20, choices=AuditLogLabel.CHOICES, null=True, blank=True, db_index=True)
+    labeled_at = models.DateTimeField(null=True, blank=True)
+
     previous_hash = models.CharField(max_length=64, null=True, blank=True)
     entry_hash = models.CharField(max_length=64, editable=False)
 
@@ -83,6 +105,8 @@ class AuditLog(models.Model):
             models.Index(fields=["actor_id", "timestamp"]),
             models.Index(fields=["category", "action", "timestamp"]),
             models.Index(fields=["risk_score"]),
+            models.Index(fields=["device_fingerprint", "timestamp"]),
+            models.Index(fields=["ip_address", "timestamp"]),
         ]
 
     def save(self, *args, **kwargs):
