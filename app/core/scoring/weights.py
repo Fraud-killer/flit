@@ -38,6 +38,13 @@ class RiskWeights:
     location_spoofing: float = 0.8
     remote_control: float = 0.85
     mitm_attack: float = 0.8
+    spoofed_timezone: float = 0.7
+    platform_mismatch: float = 0.6
+    software_renderer: float = 0.5
+    automation_markers: float = 0.8
+    device_class_mismatch: float = 0.5
+    # Travellers and expats trip this legitimately.
+    locale_country_mismatch: float = 0.15
     # Data completeness, not evidence of fraud: reported, never scored.
     req_event_attrs: float = 0.0
 
@@ -96,6 +103,12 @@ class RiskWeights:
             "location_spoofing": self.location_spoofing,
             "remote_control": self.remote_control,
             "mitm_attack": self.mitm_attack,
+            "spoofed_timezone": self.spoofed_timezone,
+            "platform_mismatch": self.platform_mismatch,
+            "software_renderer": self.software_renderer,
+            "automation_markers": self.automation_markers,
+            "device_class_mismatch": self.device_class_mismatch,
+            "locale_country_mismatch": self.locale_country_mismatch,
             "req_event_attrs": self.req_event_attrs,
         }
         if rule_code in weight_map:

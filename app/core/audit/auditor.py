@@ -47,6 +47,7 @@ class Auditor:
         rules.MultiAccountingRule,
         rules.AccountSharingRule,
         rules.DeviceTamperingRule,
+        rules.DeviceConsistencyRule,
     )
 
     @classmethod
