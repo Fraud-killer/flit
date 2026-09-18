@@ -63,18 +63,18 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name='auditlog',
-            index=models.Index(fields=['application_id', 'timestamp'], name='core_audit__applica_idx'),
+            index=models.Index(fields=['application_id', 'timestamp'], name='core_auditl_applica_b38e93_idx'),
         ),
         migrations.AddIndex(
             model_name='auditlog',
-            index=models.Index(fields=['actor_id', 'timestamp'], name='core_audit__actor_i_idx'),
+            index=models.Index(fields=['actor_id', 'timestamp'], name='core_auditl_actor_i_19c60f_idx'),
         ),
         migrations.AddIndex(
             model_name='auditlog',
-            index=models.Index(fields=['category', 'action', 'timestamp'], name='core_audit__categor_idx'),
+            index=models.Index(fields=['category', 'action', 'timestamp'], name='core_auditl_categor_dfafa9_idx'),
         ),
         migrations.AddIndex(
             model_name='auditlog',
-            index=models.Index(fields=['risk_score'], name='core_audit__risk_sc_idx'),
+            index=models.Index(fields=['risk_score'], name='core_auditl_risk_sc_6c5f67_idx'),
         ),
     ]
