@@ -267,6 +267,50 @@ curl -X POST http://localhost:18000/api/v1/applications/{app_id}/outcomes \
 
 Labels: `fraud`, `chargeback`, `legit`, `false_positive`. Send `event_id` (your transaction id) instead of `audit_id` to label that event's most recent audit.
 
+### Review Decisions
+
+Every decision is queryable, and anything that comes back for review opens a **case**.
+
+```bash
+# The decision feed. Filter by level, label, factor, client_id, device_id,
+# days, unlabelled=1.
+curl "http://localhost:18000/api/v1/applications/{app_id}/decisions?factor=multi_accounting&days=7" \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}"
+
+# The review queue (status=open by default; `all` for everything).
+curl "http://localhost:18000/api/v1/applications/{app_id}/cases" \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}"
+
+# Closing a case labels the decision behind it: confirmed_fraud -> fraud,
+# cleared -> legit. This is where most training data comes from.
+curl -X PATCH "http://localhost:18000/api/v1/applications/{app_id}/cases/{case_id}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "confirmed_fraud", "note": "Card testing"}'
+```
+
+### Simulate a Policy Change
+
+Ask what a change *would have done*, instead of shipping it and waiting for complaints. FLIT re-scores recorded decisions under candidate weights and thresholds and compares them against the labels you have reported.
+
+```bash
+curl -X POST "http://localhost:18000/api/v1/applications/{app_id}/simulations" \
+  -H "Content-Type: application/json" \
+  -d '{"days": 30, "thresholds": {"block_at": 0.5}, "weights": {"bot_detected": 0.9}}'
+```
+
+```json
+{
+  "decisions": 4820, "labelled": 312,
+  "baseline":  {"blocked": 41, "caught_fraud": 22, "missed_fraud": 18, "false_positives": 3, "precision": 0.88, "recall": 0.55},
+  "candidate": {"blocked": 96, "caught_fraud": 34, "missed_fraud": 6,  "false_positives": 11, "precision": 0.76, "recall": 0.85},
+  "changes": {"newly_blocked": 55, "newly_blocked_fraud": 12, "newly_blocked_legit": 8, "newly_allowed": 0}
+}
+```
+
+Read it as a trade: 12 more frauds caught, 8 more good customers blocked. Baseline and candidate are both recomputed the same way, so the comparison is exact even though a recomputed score can differ slightly from the one recorded at decision time.
+
+Decision thresholds are `block_at` (0.7) and `review_at` (0.5).
+
 ### Look Up a Device
 
 ```bash
