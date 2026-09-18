@@ -8,9 +8,14 @@ from rest_framework.viewsets import ViewSet
 from api.permissions import HasAuthenticated
 from rest_framework.decorators import action
 from core.guards import DeviceGuard, ApplicationGuard
+from core.models import Case, CaseNote, CaseStatus
 from api.parsers import parse_register_device_inputs
 from api.parsers import parse_outcome_inputs, parse_device_lookup_inputs
 from core.services.describe_device import DescribeDevice
+from core.services.list_decisions import ListDecisions
+from core.services.simulate_policy import SimulatePolicy
+from api.parsers import parse_decision_filters, parse_case_inputs, parse_simulation_inputs
+from api.serializers.case_serializers import serialize_case
 from core.messages.devices import msg_no_query_id_device
 from api.serializers.device_serializers import DeviceSerializer
 from core.services.create_device_by_query_id import CreateDeviceByQueryId, QueryIdDeviceNotFound
@@ -101,3 +106,104 @@ class ApplicationViewSet(ViewSet):
         )
 
         return build_api_response(data=dict(device=device))
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.GET],
+        url_path=r"decisions",
+    )
+    def decisions(self, request, pk):
+        inputs, errors = parse_decision_filters(pk, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        return build_api_response(
+            data=ListDecisions.call(application=inputs.application, filters=inputs),
+        )
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.GET],
+        url_path=r"cases",
+    )
+    def cases(self, request, pk):
+        inputs, errors = parse_decision_filters(pk, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        status_filter = request.query_params.get("status", CaseStatus.OPEN)
+
+        cases = (
+            Case.objects
+            .filter(application=inputs.application)
+            .select_related("audit_log", "assignee")
+        )
+
+        if status_filter != "all":
+            cases = cases.filter(status=status_filter)
+
+        total = cases.count()
+        page = cases[inputs.offset:inputs.offset + inputs.limit]
+
+        return build_api_response(
+            data=dict(
+                total=total,
+                limit=inputs.limit,
+                offset=inputs.offset,
+                cases=[serialize_case(case) for case in page],
+            ),
+        )
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.PATCH],
+        url_path=r"cases/(?P<case_id>[^/.]+)",
+    )
+    def case(self, request, pk, case_id=None):
+        inputs, errors = parse_case_inputs(pk, case_id, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        reviewer = self.reviewer(request)
+
+        case = inputs.case.resolve(
+            status=inputs.status,
+            note=inputs.note,
+            assignee=reviewer,
+        )
+
+        if inputs.note:
+            CaseNote.objects.create(case=case, body=inputs.note, author=reviewer)
+
+        return build_api_response(data=dict(case=serialize_case(case)))
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.POST],
+        url_path=r"simulations",
+    )
+    def simulations(self, request, pk):
+        inputs, errors = parse_simulation_inputs(pk, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        return build_api_response(
+            data=SimulatePolicy.call(
+                application=inputs.application,
+                weights=inputs.weights,
+                thresholds=inputs.thresholds,
+                days=inputs.days,
+            ),
+        )
+
+    @staticmethod
+    def reviewer(request):
+        """The person resolving a case, if a person did: HMAC authenticates
+        an application, and then there is no user to attribute it to."""
+        user = getattr(request, "user", None)
+
+        return user if getattr(user, "is_authenticated", False) else None
