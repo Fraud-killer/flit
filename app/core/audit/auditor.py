@@ -65,10 +65,15 @@ class Auditor:
         send_alerts: bool = True,
         include_historical: bool = True,
         record: bool = True,
+        device_identity=None,
     ):
         active_rules = list()
         scope = Scope()
-        scope.device_identity = await cls._resolve_device_identity(event, policy, scope)
+        # A caller that already knows the device (a replay of historical
+        # data, say) passes it in; otherwise it comes from the visit.
+        scope.device_identity = device_identity or await cls._resolve_device_identity(
+            event, policy, scope,
+        )
         scope.account_activity = await cls._load_account_activity(event, policy)
 
         for rule_class in cls.rule_classes:

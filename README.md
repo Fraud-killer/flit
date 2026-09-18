@@ -290,6 +290,19 @@ curl -X PATCH "http://localhost:18000/api/v1/applications/{app_id}/cases/{case_i
   -d '{"status": "confirmed_fraud", "note": "Card testing"}'
 ```
 
+### Backtest a Portfolio
+
+Replay a merchant's historical payments through the rules and see what FLIT would have caught, before they integrate anything.
+
+```bash
+python manage.py backtest history.csv --mapping mapping.json \
+  --application "Fintech A" --create --out report.json
+```
+
+It reports the threshold curve (what each block threshold would have caught and cost), and ranks rules by lift — how much more often each fires on fraud than on good customers. `backtest_overlap` compares two portfolios and measures how much of one's fraud was already visible in the other.
+
+See [docs/backtesting.md](docs/backtesting.md) for the mapping format, the data to ask for, and how to read the report.
+
 ### Simulate a Policy Change
 
 Ask what a change *would have done*, instead of shipping it and waiting for complaints. FLIT re-scores recorded decisions under candidate weights and thresholds and compares them against the labels you have reported.
