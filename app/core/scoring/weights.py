@@ -48,6 +48,10 @@ class RiskWeights:
     # Data completeness, not evidence of fraud: reported, never scored.
     req_event_attrs: float = 0.0
 
+    # Per-code overrides, used to try candidate weights without touching
+    # the defaults (see core.services.simulate_policy).
+    overrides: Dict[str, float] = field(default_factory=dict)
+
     category_multipliers: Dict[str, float] = field(default_factory=lambda: {
         "transaction": 1.0,
         "authentication": 0.8,
@@ -63,6 +67,9 @@ class RiskWeights:
         Weight for a rule code. Codes without a configured weight fall back to
         `default` (the score a rule attached to its message), then to 0.5.
         """
+        if rule_code in self.overrides:
+            return self.overrides[rule_code]
+
         if rule_code.startswith("bot_detected:"):
             return self.bot_detected
 
@@ -116,4 +123,17 @@ class RiskWeights:
         return 0.5 if default is None else default
 
 
+@dataclass
+class RiskThresholds:
+    """
+    Where a score turns into an action. These were implicit in RiskEngine
+    (block at CRITICAL, review at HIGH); naming them lets an application tune
+    them and lets a simulation try other values.
+    """
+
+    block_at: float = 0.7
+    review_at: float = 0.5
+
+
 DEFAULT_WEIGHTS = RiskWeights()
+DEFAULT_THRESHOLDS = RiskThresholds()

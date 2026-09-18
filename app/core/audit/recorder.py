@@ -42,6 +42,27 @@ class AuditRecorder:
 
     @classmethod
     def write(cls, *, event, policy, scope, risk_result, rule_names):
+        audit_log = cls.write_log(
+            event=event,
+            policy=policy,
+            scope=scope,
+            risk_result=risk_result,
+            rule_names=rule_names,
+        )
+
+        if risk_result.should_review:
+            cls.open_case(audit_log, policy.application)
+
+        return audit_log
+
+    @classmethod
+    def open_case(cls, audit_log, application):
+        from core.models import Case
+
+        return Case.objects.create(audit_log=audit_log, application=application)
+
+    @classmethod
+    def write_log(cls, *, event, policy, scope, risk_result, rule_names):
         application = policy.application
         identity = scope.device_identity
 
@@ -70,6 +91,12 @@ class AuditRecorder:
                 recommendation=risk_result.recommendation,
                 should_block=risk_result.should_block,
                 rules=rule_names,
+                # Kept so a simulation can re-score this decision under
+                # different weights without re-running the rules.
+                factors=[
+                    dict(code=factor.code, weight=factor.weight, score=factor.score)
+                    for factor in risk_result.factors
+                ],
             ),
         )
 
