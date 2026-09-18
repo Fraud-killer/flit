@@ -1,9 +1,8 @@
 import ipaddress
 from devkit import undefined
 from abc import ABCMeta, abstractmethod
-from devkit.checks import is_present, is_dense_str
-from devkit.messages import msg_void_or_dense_string
-from core.messages.networks import msg_void_or_ip_address
+from devkit.checks import is_present, is_trimmed_str
+from core.messages.networks import msg_void_or_ip_address, msg_void_or_user_agent
 
 
 class EventError(Exception):
@@ -23,6 +22,17 @@ class BaseEvent(metaclass=ABCMeta):
 
         self.extra = dict(item for item in kwargs.items() if item[0] not in self.attributes)
 
+    @property
+    def account_id(self):
+        """The merchant's identifier for the account behind the event."""
+        value = getattr(self, "client_id", undefined)
+        if not is_present(value):
+            value = getattr(self, "id", undefined) if self.account_id_is_event_id else undefined
+        return value if is_present(value) else None
+
+    # ClientEvent.id identifies the client; TransactionEvent.id the transaction.
+    account_id_is_event_id = False
+
     def verify_network_attrs(self):
         """Validate the optional end-user `ip_address` and `user_agent` attributes."""
         errors = list()
@@ -33,7 +43,10 @@ class BaseEvent(metaclass=ABCMeta):
             except (TypeError, ValueError):
                 errors.append(msg_void_or_ip_address.new(path="ip_address"))
 
-        if is_present(self.user_agent) and not is_dense_str(self.user_agent):
-            errors.append(msg_void_or_dense_string.new(path="user_agent"))
+        # User agents contain spaces, so they are trimmed rather than dense.
+        if is_present(self.user_agent) and not (
+            is_trimmed_str(self.user_agent) and self.user_agent.strip()
+        ):
+            errors.append(msg_void_or_user_agent.new(path="user_agent"))
 
         return errors

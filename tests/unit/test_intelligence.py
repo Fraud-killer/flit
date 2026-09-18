@@ -360,7 +360,7 @@ class TestEventNetworkAttributes:
         errors = ClientEvent(id="client_1", ip_address="999.1.1.1", user_agent="").verify()
         assert {(e.code, e.path) for e in errors} == {
             ("void_or_ip_address", "ip_address"),
-            ("void_or_dense_string", "user_agent"),
+            ("void_or_user_agent", "user_agent"),
         }
 
     def test_accepts_ipv4_and_ipv6(self):
@@ -368,6 +368,19 @@ class TestEventNetworkAttributes:
 
         for ip_address in ("8.8.8.8", "2001:4860:4860::8888"):
             assert ClientEvent(id="client_1", ip_address=ip_address).verify() == []
+
+    def test_accepts_a_real_user_agent(self):
+        from core.audit.events import ClientEvent
+
+        user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0"
+        assert ClientEvent(id="client_1", user_agent=user_agent).verify() == []
+
+    def test_rejects_a_padded_or_empty_user_agent(self):
+        from core.audit.events import ClientEvent
+
+        for user_agent in ("  Chrome/120.0 ", "", 42):
+            errors = ClientEvent(id="client_1", user_agent=user_agent).verify()
+            assert [error.code for error in errors] == ["void_or_user_agent"]
 
 
 class TestAuditorEndToEnd:
@@ -383,6 +396,7 @@ class TestAuditorEndToEnd:
             make_policy(),
             send_alerts=False,
             include_historical=False,
+            record=False,
         ))
 
     def test_intelligence_signals_raise_the_risk_score(self, no_geoip):

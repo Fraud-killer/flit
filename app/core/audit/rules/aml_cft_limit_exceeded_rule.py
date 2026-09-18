@@ -1,5 +1,6 @@
 from devkit.message import Message
 from core.money import Money, init_money
+from .money_limits import currency_mismatch
 from core.audit.events import TransactionEvent
 
 from core.audit.rules.base_rule import BaseRule
@@ -28,6 +29,11 @@ class AmlCftLimitExceededRule(BaseRule):
             if raw_aml_cft_limit is None
             else init_money(raw_aml_cft_limit)
         )
+
+        if aml_cft_limit is None: return None
+
+        mismatch = currency_mismatch(amount, aml_cft_limit)
+        if mismatch: return mismatch
 
         if amount > aml_cft_limit:
             return (

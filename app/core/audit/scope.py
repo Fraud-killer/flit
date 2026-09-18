@@ -5,6 +5,9 @@ from core.audit.lock_cache import LockCache, lockcache
 
 
 class Scope(LockCache):
+    # The DeviceIdentity resolved for the audited event, set by Auditor.
+    device_identity = None
+
     @lockcache(lambda visit_id: visit_id)
     async def fetch_visit(self, visit_id):
         return await FetchVisitData.async_call(

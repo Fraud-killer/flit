@@ -21,6 +21,45 @@ def pytest_configure():
     django.setup()
 
 
+@pytest.fixture(scope="session")
+def test_database():
+    """
+    Create the test database once per session. Avoids pytest-django, whose
+    plugin conflicted with this project's own django.setup().
+    """
+    from django.db import connection
+    from django.test.utils import setup_test_environment, teardown_test_environment
+
+    setup_test_environment()
+    configuration = connection.creation.create_test_db(verbosity=0)
+
+    yield
+
+    connection.creation.destroy_test_db(configuration, verbosity=0)
+    teardown_test_environment()
+
+
+@pytest.fixture
+def db(test_database):
+    """A clean database for one test."""
+    from django.core.management import call_command
+
+    yield
+
+    call_command("flush", interactive=False, verbosity=0, allow_cascade=True)
+
+
+@pytest.fixture
+def application(db):
+    """An Application (with the Policy its post_save signal creates)."""
+    from core.models import User, Organization, Application
+
+    user = User.objects.create_user(email="owner@flit.io", password="x" * 12)
+    organization = Organization.objects.create(name="Test Org", owner=user)
+
+    return Application.objects.create(name="Test App", organization=organization)
+
+
 @pytest.fixture
 def mock_cache():
     """Mock Django cache."""

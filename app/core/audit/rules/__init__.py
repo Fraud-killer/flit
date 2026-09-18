@@ -22,3 +22,7 @@ from .issuer_signal_rule import IssuerSignalRule as IssuerSignalRule
 
 from .ip_reputation_rule import IPReputationRule as IPReputationRule
 from .bot_signal_rule import BotSignalRule as BotSignalRule
+
+from .multi_accounting_rule import MultiAccountingRule as MultiAccountingRule
+from .account_sharing_rule import AccountSharingRule as AccountSharingRule
+from .device_tampering_rule import DeviceTamperingRule as DeviceTamperingRule

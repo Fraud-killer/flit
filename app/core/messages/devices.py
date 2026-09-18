@@ -15,3 +15,11 @@ msg_query_dvc_unregistered = (
         text="Device for the query id provided is not registered",
     )
 )
+
+
+msg_device_ref_exist = (
+    Message(
+        code="device_ref_exist",
+        text="Must refer to a device seen by this application",
+    )
+)

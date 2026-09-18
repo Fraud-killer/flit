@@ -10,6 +10,10 @@ def get_kyc_level_limits_default():
     return policy_defaults.kyc_level_limits
 
 
+def get_device_thresholds_default():
+    return dict()
+
+
 class Policy(models.Model):
     defaults = policy_defaults
 
@@ -17,6 +21,8 @@ class Policy(models.Model):
     aml_cft_limit = models.CharField(default=defaults.aml_cft_limit)
     kyc_level_limits = models.JSONField(default=get_kyc_level_limits_default)
     device_validity_days = models.IntegerField(default=defaults.device_validity_days)
+    # Overrides for core.audit.rules.device_thresholds.DEFAULT_DEVICE_THRESHOLDS
+    device_thresholds = models.JSONField(default=get_device_thresholds_default, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

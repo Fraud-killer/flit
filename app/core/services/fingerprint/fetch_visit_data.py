@@ -93,7 +93,27 @@ class FetchVisitData:
             incognito=cls.product_result(visit_data, "incognito"),
             # "notDetected", "good" (e.g. search engines) or "bad"
             bot=bot_result.get("result") if isinstance(bot_result, dict) else None,
+            # Device integrity Smart Signals: flag -> True/False/None
+            device_signals={
+                flag: cls.product_result(visit_data, product)
+                for flag, product in cls.DEVICE_SIGNAL_PRODUCTS.items()
+            },
+            suspect_score=cls.product_result(visit_data, "suspectScore"),
         )
+
+    # FLIT flag -> Fingerprint Server API product with a boolean `result`
+    DEVICE_SIGNAL_PRODUCTS = {
+        "tampering": "tampering",
+        "virtual_machine": "virtualMachine",
+        "emulator": "emulator",
+        "jailbroken": "jailbroken",
+        "hooking_framework": "frida",
+        "cloned_app": "clonedApp",
+        "developer_tools": "developerTools",
+        "location_spoofing": "locationSpoofing",
+        "remote_control": "remoteControl",
+        "mitm_attack": "mitmAttack",
+    }
 
     @staticmethod
     def product_result(visit_data, product, field="result"):

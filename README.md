@@ -202,6 +202,8 @@ Payment rules also read optional payment fields when you send them: `status`, `g
 {
   "ok": true,
   "data": {
+    "audit_id": "c27c2f50-04a9-49e5-bebb-893d0a59d8fc",
+    "device_id": "cd71cec3-8aae-4425-9339-861ed71ef237",
     "risk_score": 0.35,
     "risk_level": "medium",
     "should_block": false,
@@ -213,6 +215,32 @@ Payment rules also read optional payment fields when you send them: `status`, `g
   }
 }
 ```
+
+Every audit is stored, which is what the velocity, account-takeover, historical-score and device-graph checks read. `audit_id` identifies that record, and `device_id` the device FLIT resolved for the event (`null` when no `visit_id` was sent).
+
+### Report an Outcome
+
+Tell FLIT what actually happened. Labels are how thresholds get tuned, and they are the training data for scoring models.
+
+```bash
+curl -X POST http://localhost:18000/api/v1/applications/{app_id}/outcomes \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}" \
+  -H "Content-Type: application/json" \
+  -H "X-Timestamp: $(date +%s)" \
+  -H "X-Nonce: $(uuidgen)" \
+  -d '{"audit_id": "c27c2f50-...", "label": "fraud"}'
+```
+
+Labels: `fraud`, `chargeback`, `legit`, `false_positive`. Send `event_id` (your transaction id) instead of `audit_id` to label that event's most recent audit.
+
+### Look Up a Device
+
+```bash
+curl http://localhost:18000/api/v1/applications/{app_id}/devices/{device_id} \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}"
+```
+
+Returns the device's trust score, integrity flags, the accounts your application has seen on it, its recent events and their labels. Devices are only visible to applications that have seen them.
 
 ### Register a Device
 
@@ -290,6 +318,22 @@ Payment rules attach a per-signal score to each finding; it is used as the weigh
 |------|-------------|-------------|
 | `IPReputationRule` | Tor exit nodes, blocklisted, proxy, VPN, datacenter and high-risk-country IPs | 0.3 – 0.9 |
 | `BotSignalRule` | Automated user agents and Fingerprint bad-bot detection (search crawlers allowed) | 0.7 |
+
+### Device Graph Rules
+
+FLIT keeps a device graph: every `visit_id` resolves to a device, and each device records the accounts that used it.
+
+| Rule | Description | Risk Weight |
+|------|-------------|-------------|
+| `MultiAccountingRule` | One device used by too many accounts | 0.7 |
+| `AccountSharingRule` | One account used from too many devices (`concurrent_devices` within an hour, `account_sharing` within a day) | 0.5 – 0.7 |
+| `DeviceTamperingRule` | Tampering, emulators, VMs, rooted/jailbroken devices, hooking frameworks, cloned apps, location spoofing, remote control and MITM proxies | 0.3 – 0.9 |
+
+Thresholds default to 3 accounts per device (30 days), 3 devices per account per day and 2 per hour. Override them per application on `Policy.device_thresholds`:
+
+```json
+{"max_accounts_per_device": 5, "accounts_per_device_window_days": 30}
+```
 
 ## Risk Levels
 

@@ -1,5 +1,6 @@
 from core.models import Device
 from core.services.fingerprint import FetchVisitData
+from core.services.resolve_device_identity import ResolveDeviceIdentity
 
 
 class QueryIdDeviceNotFound(Exception):
@@ -30,6 +31,12 @@ class CreateDeviceByQueryId:
                 raw_data=visit_data.raw_data,
                 fingerprint=visit_data.fingerprint,
             )
+
+        device.identity = ResolveDeviceIdentity.call(
+            visit=visit_data,
+            application=application,
+            client_id=client_id,
+        )
 
         is_new_location = True
 

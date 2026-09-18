@@ -1,6 +1,7 @@
 from uuid import uuid4
 from django.db import models
 from core.models.application import Application
+from core.models.device_identity import DeviceIdentity
 
 
 class Device(models.Model):
@@ -13,5 +14,6 @@ class Device(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     application = models.ForeignKey(Application, on_delete=models.CASCADE)
+    identity = models.ForeignKey(DeviceIdentity, null=True, blank=True, on_delete=models.SET_NULL)
 
     def __str__(self): return f"Device ({self.fingerprint})"
