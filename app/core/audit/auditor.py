@@ -1,10 +1,18 @@
 import asyncio
+import logging
 from typing import Optional
+from asgiref.sync import sync_to_async
 from core.audit import rules
 from devkit.struct import Struct
 from core.audit.scope import Scope
 from core.scoring import RiskEngine, RiskLevel
+from core.audit.recorder import AuditRecorder
+from core.audit.rules.visit_signals import fetch_event_visit
+from core.services.resolve_device_identity import ResolveDeviceIdentity
 from core.realtime.alerts import AlertManager, Alert, AlertLevel, AlertCategory
+
+
+logger = logging.getLogger(__name__)
 
 
 class Auditor:
@@ -35,6 +43,10 @@ class Auditor:
         # IP & Bot Intelligence Rules
         rules.IPReputationRule,
         rules.BotSignalRule,
+        # Device Graph Rules
+        rules.MultiAccountingRule,
+        rules.AccountSharingRule,
+        rules.DeviceTamperingRule,
     )
 
     @classmethod
@@ -45,9 +57,11 @@ class Auditor:
         *,
         send_alerts: bool = True,
         include_historical: bool = True,
+        record: bool = True,
     ):
         active_rules = list()
         scope = Scope()
+        scope.device_identity = await cls._resolve_device_identity(event, policy, scope)
 
         for rule_class in cls.rule_classes:
             rule = rule_class(event=event, policy=policy, scope=scope)
@@ -78,8 +92,11 @@ class Auditor:
         device_trust_score = None
 
         if include_historical:
-            client_id = getattr(event, "client_id", None)
-            device_fingerprint = getattr(event, "device_fingerprint", None)
+            client_id = event.account_id
+            device_fingerprint = (
+                scope.device_identity.external_id
+                if scope.device_identity else None
+            )
 
             if client_id:
                 historical_scores = await risk_engine.get_historical_scores(
@@ -107,7 +124,19 @@ class Auditor:
         if send_alerts and risk_result.level in [RiskLevel.HIGH, RiskLevel.CRITICAL]:
             await cls._send_risk_alert(event, policy, risk_result, reasons)
 
+        audit_log = None
+        if record:
+            audit_log = await AuditRecorder.record(
+                event=event,
+                policy=policy,
+                scope=scope,
+                risk_result=risk_result,
+                rule_names=rule_names,
+            )
+
         return Struct(
+            audit_id=str(audit_log.id) if audit_log else None,
+            device_id=str(scope.device_identity.id) if scope.device_identity else None,
             risk_score=risk_result.total_score,
             risk_level=risk_result.level.value,
             rules=rule_names,
@@ -120,8 +149,24 @@ class Auditor:
         )
 
     @classmethod
+    async def _resolve_device_identity(cls, event, policy, scope):
+        visit = await fetch_event_visit(event, scope, cls.__name__)
+        if visit is None:
+            return None
+
+        try:
+            return await sync_to_async(ResolveDeviceIdentity.call)(
+                visit=visit,
+                application=policy.application,
+                client_id=event.account_id,
+            )
+        except Exception:
+            logger.exception("Could not resolve device identity")
+            return None
+
+    @classmethod
     async def _send_risk_alert(cls, event, policy, risk_result, reasons):
-        client_id = getattr(event, "client_id", None)
+        client_id = event.account_id
         application_id = str(policy.application.id)
 
         alert_level = AlertLevel.WARNING
