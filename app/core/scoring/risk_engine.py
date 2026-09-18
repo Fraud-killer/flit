@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from django.utils import timezone
 
-from core.scoring.weights import RiskWeights, DEFAULT_WEIGHTS
+from core.scoring.weights import RiskWeights, RiskThresholds, DEFAULT_WEIGHTS, DEFAULT_THRESHOLDS
 
 
 class RiskLevel(str, Enum):
@@ -77,8 +77,13 @@ class RiskScore:
 
 
 class RiskEngine:
-    def __init__(self, weights: Optional[RiskWeights] = None):
+    def __init__(
+        self,
+        weights: Optional[RiskWeights] = None,
+        thresholds: Optional[RiskThresholds] = None,
+    ):
         self.weights = weights or DEFAULT_WEIGHTS
+        self.thresholds = thresholds or DEFAULT_THRESHOLDS
 
     def calculate_risk(
         self,
@@ -128,8 +133,8 @@ class RiskEngine:
 
         level = RiskLevel.from_score(total_score)
         recommendation = self._get_recommendation(level, factors)
-        should_block = level == RiskLevel.CRITICAL or total_score >= 0.85
-        should_review = level in [RiskLevel.HIGH, RiskLevel.CRITICAL] or total_score >= 0.5
+        should_block = total_score >= self.thresholds.block_at
+        should_review = total_score >= self.thresholds.review_at
 
         confidence = self._calculate_confidence(factors, historical_risk_scores)
 

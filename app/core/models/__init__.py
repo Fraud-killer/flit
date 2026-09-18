@@ -7,5 +7,9 @@ from .device_identity import DeviceIdentity as DeviceIdentity
 from .device_identity import DeviceAccountLink as DeviceAccountLink
 from .device_identity import DeviceSignature as DeviceSignature
 
+from .case import Case as Case
+from .case import CaseNote as CaseNote
+from .case import CaseStatus as CaseStatus
+
 from core.audit.models import AuditLog as AuditLog
 from core.audit.models import AuditLogArchive as AuditLogArchive
