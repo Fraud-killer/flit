@@ -48,6 +48,12 @@ class Auditor:
         rules.AccountSharingRule,
         rules.DeviceTamperingRule,
         rules.DeviceConsistencyRule,
+        # Money Mule Rules
+        rules.PassThroughRule,
+        rules.StructuringRule,
+        rules.DormantAwakeningRule,
+        rules.AccountFarmingRule,
+        rules.MuleNetworkRule,
     )
 
     @classmethod
@@ -63,6 +69,7 @@ class Auditor:
         active_rules = list()
         scope = Scope()
         scope.device_identity = await cls._resolve_device_identity(event, policy, scope)
+        scope.account_activity = await cls._load_account_activity(event, policy)
 
         for rule_class in cls.rule_classes:
             rule = rule_class(event=event, policy=policy, scope=scope)
@@ -118,6 +125,7 @@ class Auditor:
         risk_result = risk_engine.calculate_risk(
             message_dicts,
             event_category=event_category,
+            account_age_days=getattr(event, "account_age_days", None) or None,
             historical_risk_scores=historical_scores,
             device_trust_score=device_trust_score,
         )
@@ -163,6 +171,22 @@ class Auditor:
             )
         except Exception:
             logger.exception("Could not resolve device identity")
+            return None
+
+    @classmethod
+    async def _load_account_activity(cls, event, policy):
+        from core.services.account_activity import AccountActivity
+
+        if not event.account_id:
+            return None
+
+        try:
+            return await sync_to_async(AccountActivity.load)(
+                application=policy.application,
+                client_id=event.account_id,
+            )
+        except Exception:
+            logger.exception("Could not load account activity")
             return None
 
     @classmethod
