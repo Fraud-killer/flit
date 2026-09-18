@@ -14,6 +14,7 @@ class SecurityMiddleware:
     RATE_LIMIT_ACTIONS = {
         "/api/v1/auth/": "authentication",
         "/api/v1/applications/": "api_general",
+        "/api/v1/collect": "device_collection",
     }
 
     def __init__(self, get_response):

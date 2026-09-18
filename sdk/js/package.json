@@ -1,0 +1,16 @@
+{
+  "name": "@flit/browser",
+  "version": "0.1.0",
+  "description": "FLIT browser SDK: collects device signals and exchanges them for a visit token",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "files": ["src"],
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT",
+  "sideEffects": false
+}

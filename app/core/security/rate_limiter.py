@@ -26,6 +26,8 @@ class RateLimiter:
         "api_general": RateLimitConfig(requests=100, window_seconds=60),
         "api_audit": RateLimitConfig(requests=1000, window_seconds=60),
         "device_registration": RateLimitConfig(requests=10, window_seconds=60),
+        # Public, unauthenticated: one browser sends a handful of visits.
+        "device_collection": RateLimitConfig(requests=60, window_seconds=60),
         "high_risk_action": RateLimitConfig(requests=3, window_seconds=300, block_duration_seconds=600),
     }
 

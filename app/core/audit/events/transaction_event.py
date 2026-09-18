@@ -19,6 +19,7 @@ class TransactionEvent(BaseEvent):
         "type",
         "amount",
         "visit_id",
+        "visit_token",
         "kyc_level",
         "client_id",
         "ip_address",
@@ -81,6 +82,7 @@ class TransactionEvent(BaseEvent):
         ):
             errors.append(msg_void_or_decimal.new(path="daily_cumulative_debit_balance"))
 
+        errors.extend(self.verify_visit_attrs())
         errors.extend(self.verify_network_attrs())
 
         return errors

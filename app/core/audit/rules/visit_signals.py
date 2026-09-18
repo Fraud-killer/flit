@@ -12,6 +12,15 @@ async def fetch_event_visit(event, scope, caller):
     Intelligence only enriches the decision, so a Fingerprint outage or
     missing API key must not fail the whole audit.
     """
+    visit_token = getattr(event, "visit_token", None)
+
+    if is_present(visit_token):
+        try:
+            return await scope.fetch_collected_visit(visit_token)
+        except Exception as error:
+            logger.warning(f"{caller}: could not read visit token: {error}")
+            return None
+
     visit_id = getattr(event, "visit_id", None)
     if not is_present(visit_id):
         return None

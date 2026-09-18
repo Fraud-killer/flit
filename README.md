@@ -148,7 +148,7 @@ The API will be available at `http://localhost:18000`
 | `CACHE_URL` | Redis URL for caching | `redis://localhost:6379/1` |
 | `SECRET_KEY` | Django secret key | Required |
 | `MCRYPT_KEY` | Encryption key for secrets | Required |
-| `FINGERPRINT_SERVER_API_KEY` | Fingerprint server API key (device identification and Smart Signals) | Required for device rules |
+| `FINGERPRINT_SERVER_API_KEY` | Fingerprint server API key (optional second source of device identification) | Optional |
 | `ALLOWED_HOSTS` | JSON array of allowed hosts | `["localhost", "127.0.0.1"]` in debug, `[]` otherwise |
 | `SECURE_SSL_REDIRECT` | Redirect HTTP to HTTPS when not in debug | `true` |
 | `GEOIP_DB_PATH` | Directory containing `GeoLite2-ASN.mmdb` and `GeoLite2-Country.mmdb` | Unset (geolocation disabled) |
@@ -217,6 +217,32 @@ Payment rules also read optional payment fields when you send them: `status`, `g
 ```
 
 Every audit is stored, which is what the velocity, account-takeover, historical-score and device-graph checks read. `audit_id` identifies that record, and `device_id` the device FLIT resolved for the event (`null` when no `visit_id` was sent).
+
+### Collect Device Signals (Browser SDK)
+
+FLIT identifies devices itself through [`@flit/browser`](sdk/js/README.md). The page collects signals and exchanges them for a visit token:
+
+```js
+import { collect } from "@flit/browser";
+
+const { visitToken } = await collect({ key: "flit_pk_..." });
+```
+
+```bash
+# What the SDK posts. Public, unauthenticated, rate limited and CORS-open:
+# the collection key identifies an application, it authorises nothing.
+curl -X POST http://localhost:18000/api/v1/collect \
+  -H "Content-Type: application/json" \
+  -d '{"key": "flit_pk_...", "signals": { ... }, "device_key": "flit_dk_..."}'
+```
+
+Send the token to your server and include it as `visit_token` in the audit. Tokens last 30 minutes.
+
+Identifying material is hashed in the browser and hashed again before storage, so no raw signal is ever written to the database. Devices are **not** linked across applications; each merchant sees only its own view.
+
+A device is recognised by, strongest first: the same signature seen before, the device key the browser returned (only when the signals still broadly agree, so a copied key proves nothing), then a close-enough signal match. One heavy component such as canvas or WebGL may drift — after a browser update, say — and the device is still recognised; two may not.
+
+`visit_token` (FLIT's own SDK) and `visit_id` (Fingerprint) can both be used; send whichever you have.
 
 ### Report an Outcome
 
@@ -318,6 +344,14 @@ Payment rules attach a per-signal score to each finding; it is used as the weigh
 |------|-------------|-------------|
 | `IPReputationRule` | Tor exit nodes, blocklisted, proxy, VPN, datacenter and high-risk-country IPs | 0.3 – 0.9 |
 | `BotSignalRule` | Automated user agents and Fingerprint bad-bot detection (search crawlers allowed) | 0.7 |
+
+### Device Consistency Rules
+
+Cross-checks on signals collected by the FLIT SDK. A spoofed browser can change any single value; keeping every value consistent with the others is much harder.
+
+| Rule | Description | Risk Weight |
+|------|-------------|-------------|
+| `DeviceConsistencyRule` | `spoofed_timezone` (zone and UTC offset disagree), `platform_mismatch`, `software_renderer` (VMs and headless browsers), `automation_markers`, `device_class_mismatch` (touch support contradicts the device), `locale_country_mismatch` | 0.15 – 0.8 |
 
 ### Device Graph Rules
 

@@ -19,14 +19,14 @@ class ResolveDeviceIdentity:
         signals = getattr(visit, "device_signals", None) or {}
 
         identity, _ = DeviceIdentity.objects.get_or_create(
-            source=DeviceIdentitySource.FINGERPRINT,
+            source=getattr(visit, "source", DeviceIdentitySource.FINGERPRINT),
             external_id=visit.fingerprint,
         )
 
         DeviceIdentity.objects.filter(pk=identity.pk).update(
             flags=sorted(flag for flag, value in signals.items() if value),
             last_ip_address=getattr(visit, "ip", None),
-            last_country=getattr(visit, "country", None),
+            last_country=getattr(visit, "country", None) or getattr(visit, "country_code", None),
             event_count=F("event_count") + 1,
             last_seen_at=now,
         )
