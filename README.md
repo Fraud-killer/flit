@@ -238,6 +238,14 @@ curl -X POST http://localhost:18000/api/v1/collect \
 
 Send the token to your server and include it as `visit_token` in the audit. Tokens last 30 minutes.
 
+**Restrict who can use your key.** Set `Application.collect_origins` to the sites allowed to call `/collect` with it:
+
+```json
+["https://shop.example.com", "https://*.example.com"]
+```
+
+An unlisted origin gets 403 and no CORS headers, so the browser cannot read the refusal either. An empty list accepts any origin, so an integration keeps working until you lock it down. Requests with no `Origin` header (your own server, a native app) are not affected: the allowlist stops another *website* using your key, which is what browsers can enforce.
+
 Identifying material is hashed in the browser and hashed again before storage, so no raw signal is ever written to the database. Devices are **not** linked across applications; each merchant sees only its own view.
 
 A device is recognised by, strongest first: the same signature seen before, the device key the browser returned (only when the signals still broadly agree, so a copied key proves nothing), then a close-enough signal match. One heavy component such as canvas or WebGL may drift — after a browser update, say — and the device is still recognised; two may not.

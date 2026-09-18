@@ -8,6 +8,14 @@ msg_app_ref_exist = (
     )
 )
 
+msg_origin_not_allowed = (
+    Message(
+        code="origin_not_allowed",
+        text="This origin is not allowed to use the application collection key",
+    )
+)
+
+
 msg_collect_key_exist = (
     Message(
         code="collect_key_exist",
