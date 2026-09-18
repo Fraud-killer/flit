@@ -194,6 +194,8 @@ curl -X POST http://localhost:18000/api/v1/applications/{app_id}/audit-transacti
 
 `ip_address` and `user_agent` are the **end user's** values. FLIT receives the request from your server, so it cannot see them itself. When omitted, the IP and user agent Fingerprint recorded for `visit_id` are used.
 
+For mule detection, send `counterparty_id` (who the money came from or went to) and `account_age_days`. Counterparties are what turn "six credits" into "six different senders", which is the difference between a busy account and a collection point.
+
 Payment rules also read optional payment fields when you send them: `status`, `gateway_message`, `provider_responses`, `card_fingerprint`, `card_bin`, `payment_instrument`, `browser_details`, `billing` and `shipping`.
 
 ### Response
@@ -396,6 +398,33 @@ Payment rules attach a per-signal score to each finding; it is used as the weigh
 |------|-------------|-------------|
 | `IPReputationRule` | Tor exit nodes, blocklisted, proxy, VPN, datacenter and high-risk-country IPs | 0.3 – 0.9 |
 | `BotSignalRule` | Automated user agents and Fingerprint bad-bot detection (search crawlers allowed) | 0.7 |
+
+### Money Mule Rules
+
+Mule accounts are recognised by the shape of money moving through them, not by any single transaction. These rules read the account's recorded history, so they need `POST /audit-transaction` to be called for both credits and debits.
+
+| Rule | Description | Risk Weight |
+|------|-------------|-------------|
+| `PassThroughRule` | Account pays out most of what it just received (`pass_through_funds`) | 0.75 |
+| `StructuringRule` | Money arriving from many different senders (`many_unique_payers`), or a burst of credits (`credit_structuring`) | 0.55 – 0.7 |
+| `DormantAwakeningRule` | A long-quiet account suddenly moving money (`dormant_account_activity`) | 0.5 |
+| `AccountFarmingRule` | Several accounts first seen on one device within a day (`account_farming`) | 0.8 |
+| `MuleNetworkRule` | Account shares a device with accounts already confirmed fraudulent (`mule_network_device`) | 0.9 |
+
+`MuleNetworkRule` is what the device graph plus your reported outcomes buy together: mules work in sets, and once one is confirmed, the rest of the set becomes visible.
+
+Thresholds default to 80% paid out within an hour, 5 senders a day, 8 credits a day, 60 days of dormancy, and 3 new accounts per device per day. Override them per application on `Policy.mule_thresholds`.
+
+### Look Up an Account
+
+The profile a fraud team opens when a payment is held:
+
+```bash
+curl "http://localhost:18000/api/v1/applications/{app_id}/accounts/{client_id}" \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}"
+```
+
+Returns 30-day money flow (credits, debits, unique payers and payees, and the pass-through ratio), every device the account has used and how many other accounts share it, which mule signals have fired and how often, reported labels and open cases.
 
 ### Device Consistency Rules
 

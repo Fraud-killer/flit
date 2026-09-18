@@ -158,6 +158,10 @@ class RiskEngine:
         factors: List[RiskFactor],
         event_category: str,
     ) -> float:
+        # Zero-weight factors (data completeness markers) are reported but
+        # are not evidence, so they must not dilute the average either.
+        factors = [factor for factor in factors if factor.weight > 0]
+
         if not factors:
             return 0.0
 

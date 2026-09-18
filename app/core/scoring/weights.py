@@ -45,6 +45,12 @@ class RiskWeights:
     device_class_mismatch: float = 0.5
     # Travellers and expats trip this legitimately.
     locale_country_mismatch: float = 0.15
+    pass_through_funds: float = 0.75
+    many_unique_payers: float = 0.7
+    credit_structuring: float = 0.55
+    dormant_account_activity: float = 0.5
+    account_farming: float = 0.8
+    mule_network_device: float = 0.9
     # Data completeness, not evidence of fraud: reported, never scored.
     req_event_attrs: float = 0.0
 
@@ -116,6 +122,12 @@ class RiskWeights:
             "automation_markers": self.automation_markers,
             "device_class_mismatch": self.device_class_mismatch,
             "locale_country_mismatch": self.locale_country_mismatch,
+            "pass_through_funds": self.pass_through_funds,
+            "many_unique_payers": self.many_unique_payers,
+            "credit_structuring": self.credit_structuring,
+            "dormant_account_activity": self.dormant_account_activity,
+            "account_farming": self.account_farming,
+            "mule_network_device": self.mule_network_device,
             "req_event_attrs": self.req_event_attrs,
         }
         if rule_code in weight_map:

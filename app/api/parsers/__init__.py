@@ -9,3 +9,4 @@ from .parse_collect_inputs import parse_collect_inputs as parse_collect_inputs
 from .parse_decision_filters import parse_decision_filters as parse_decision_filters
 from .parse_case_inputs import parse_case_inputs as parse_case_inputs
 from .parse_simulation_inputs import parse_simulation_inputs as parse_simulation_inputs
+from .parse_account_lookup_inputs import parse_account_lookup_inputs as parse_account_lookup_inputs

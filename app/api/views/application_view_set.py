@@ -13,6 +13,8 @@ from api.parsers import parse_register_device_inputs
 from api.parsers import parse_outcome_inputs, parse_device_lookup_inputs
 from core.services.describe_device import DescribeDevice
 from core.services.list_decisions import ListDecisions
+from core.services.describe_account import DescribeAccount
+from api.parsers import parse_account_lookup_inputs
 from core.services.simulate_policy import SimulatePolicy
 from api.parsers import parse_decision_filters, parse_case_inputs, parse_simulation_inputs
 from api.serializers.case_serializers import serialize_case
@@ -199,6 +201,24 @@ class ApplicationViewSet(ViewSet):
                 days=inputs.days,
             ),
         )
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.GET],
+        url_path=r"accounts/(?P<client_id>[^/.]+)",
+    )
+    def account(self, request, pk, client_id=None):
+        inputs, errors = parse_account_lookup_inputs(pk, client_id)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        account = DescribeAccount.call(
+            application=inputs.application,
+            client_id=inputs.client_id,
+        )
+
+        return build_api_response(data=dict(account=account))
 
     @staticmethod
     def reviewer(request):
