@@ -32,8 +32,8 @@ class ConfigValidator:
     # Optional but recommended for production
     RECOMMENDED_VARS = [
         ("REDIS_URL", "Redis URL for caching and channels"),
-        ("ALLOWED_HOSTS", "Comma-separated list of allowed hosts"),
-        ("FINGERPRINT_API_KEY", "Fingerprint.js API key"),
+        ("ALLOWED_HOSTS", "JSON array of allowed hosts"),
+        ("FINGERPRINT_SERVER_API_KEY", "Fingerprint server API key"),
     ]
     
     # Security-sensitive defaults that should be changed
@@ -45,7 +45,6 @@ class ConfigValidator:
     # Minimum lengths for security keys
     MIN_KEY_LENGTHS = {
         "SECRET_KEY": 50,
-        "MCRYPT_KEY": 32,
     }
     
     def __init__(self):
@@ -66,6 +65,7 @@ class ConfigValidator:
         self._check_recommended_vars()
         self._check_insecure_defaults()
         self._check_key_lengths()
+        self._check_mcrypt_key()
         self._check_database_config()
         self._check_debug_mode()
         
@@ -130,6 +130,23 @@ class ConfigValidator:
                     message=f"Key length ({len(value)}) below recommended minimum ({min_length})",
                     severity="warning"
                 ))
+    
+    def _check_mcrypt_key(self):
+        """MCRYPT_KEY must be a valid Fernet key (32 url-safe base64-encoded bytes)."""
+        value = os.environ.get("MCRYPT_KEY", "")
+        if not value:
+            return
+
+        from cryptography.fernet import Fernet
+
+        try:
+            Fernet(value.encode())
+        except (ValueError, TypeError):
+            self.errors.append(ConfigError(
+                variable="MCRYPT_KEY",
+                message="Not a valid Fernet key; generate one with Fernet.generate_key()",
+                severity="error"
+            ))
     
     def _check_database_config(self):
         """Validate database configuration."""

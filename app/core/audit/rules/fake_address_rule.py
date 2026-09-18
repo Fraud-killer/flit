@@ -7,10 +7,10 @@ geographically impossible combinations.
 """
 
 from typing import Any
-from .base_rule import BaseRule
+from .payment_rule import PaymentRule
 
 
-class FakeAddressRule(BaseRule):
+class FakeAddressRule(PaymentRule):
     """
     Detects fake or suspicious addresses in billing/shipping data.
     
@@ -22,6 +22,8 @@ class FakeAddressRule(BaseRule):
     - Country/city mismatches
     """
     
+    trigger_fields = ("billing", "shipping")
+
     name = "Fake Address Detection"
     weight = 0.7
     
@@ -47,7 +49,7 @@ class FakeAddressRule(BaseRule):
         "undefined", "placeholder", "sample", "demo",
     ]
     
-    async def apply(self, event: dict[str, Any], policy: dict[str, Any]) -> None:
+    async def analyze(self, event: dict[str, Any]) -> None:
         """Check for fake address patterns."""
         
         billing = event.get("billing", {})
@@ -85,7 +87,8 @@ class FakeAddressRule(BaseRule):
         if city in self.FAKE_CITIES:
             self.add_message(
                 f"Known fake city in {address_type}: '{city}'",
-                severity="high"
+                severity="high",
+                code="fake_city"
             )
             issues.append("fake_city")
         
@@ -94,7 +97,8 @@ class FakeAddressRule(BaseRule):
             if fake_street in address1 or fake_street in address2:
                 self.add_message(
                     f"Known fake street pattern in {address_type}",
-                    severity="high"
+                    severity="high",
+                    code="fake_street"
                 )
                 issues.append("fake_street")
                 break
@@ -103,7 +107,8 @@ class FakeAddressRule(BaseRule):
         if zip_code in self.FAKE_ZIP_CODES:
             self.add_message(
                 f"Known test zip code in {address_type}: '{zip_code}'",
-                severity="medium"
+                severity="medium",
+                code="fake_zip_code"
             )
             issues.append("fake_zip")
         
@@ -113,7 +118,8 @@ class FakeAddressRule(BaseRule):
             if pattern in all_fields and len(pattern) > 2:
                 self.add_message(
                     f"Placeholder text detected in {address_type}: '{pattern}'",
-                    severity="medium"
+                    severity="medium",
+                    code="placeholder_address"
                 )
                 issues.append("placeholder")
                 break
@@ -131,7 +137,8 @@ class FakeAddressRule(BaseRule):
         if address1 and address2 and address1 == address2:
             self.add_message(
                 f"Duplicate address lines in {address_type} (address1 == address2)",
-                severity="low"
+                severity="low",
+                code="duplicate_address_lines"
             )
     
     def _check_address_mismatch(self, billing: dict, shipping: dict) -> None:
@@ -147,7 +154,8 @@ class FakeAddressRule(BaseRule):
             self.add_message(
                 f"Billing country ({billing_country}) differs from "
                 f"shipping country ({shipping_country})",
-                severity="medium"
+                severity="medium",
+                code="billing_shipping_country_mismatch"
             )
     
     def _check_geographic_consistency(self, address: dict, address_type: str) -> None:
@@ -172,7 +180,8 @@ class FakeAddressRule(BaseRule):
             if fake_city in city and country == wrong_country:
                 self.add_message(
                     f"Geographic impossibility: '{city}' is not in {country}",
-                    severity="high"
+                    severity="high",
+                    code="impossible_address_geography"
                 )
                 return
         
@@ -181,5 +190,6 @@ class FakeAddressRule(BaseRule):
             if country and country != "JP":
                 self.add_message(
                     f"Japanese address with non-Japanese country code: {country}",
-                    severity="medium"
+                    severity="medium",
+                    code="address_script_country_mismatch"
                 )

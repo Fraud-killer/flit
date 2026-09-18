@@ -14,7 +14,7 @@ from collections import defaultdict
 
 from django.core.cache import cache
 
-from core.audit.rules.base_rule import BaseRule
+from core.audit.rules.payment_rule import PaymentRule
 
 
 @dataclass
@@ -26,7 +26,7 @@ class DeclinePattern:
     message: str
 
 
-class GatewayPatternRule(BaseRule):
+class GatewayPatternRule(PaymentRule):
     """
     Analyzes gateway decline patterns to identify fraud and operational issues.
     
@@ -146,7 +146,30 @@ class GatewayPatternRule(BaseRule):
     CACHE_PREFIX = "gateway_pattern:"
     CACHE_TTL = 3600  # 1 hour
 
-    async def execute(self, event: Dict[str, Any]) -> Dict[str, Any]:
+    trigger_fields = ("gateway_message",)
+
+    async def perform(self):
+        result = await self.analyze(self.payload)
+        if result["risk_score"] <= 0:
+            return []
+
+        code = (
+            "gateway_repeated_fraud_declines"
+            if result["escalated"]
+            else f"gateway_{result['pattern']}"
+        )
+
+        return [
+            self.signal(
+                code,
+                result["message"],
+                result["risk_score"],
+                action=result["action"],
+                decline_history=result["decline_history"],
+            )
+        ]
+
+    async def analyze(self, event: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze gateway decline patterns."""
         gateway_message = event.get("gateway_message", "")
         card_fingerprint = event.get("card_fingerprint", "")
@@ -159,6 +182,7 @@ class GatewayPatternRule(BaseRule):
             "action": "ALLOW",
             "message": "",
             "decline_history": {},
+            "escalated": False,
         }
 
         if status != "failed" or not gateway_message:
@@ -194,6 +218,7 @@ class GatewayPatternRule(BaseRule):
                 result["risk_score"] = max(result["risk_score"], 0.9)
                 result["action"] = "BLOCK"
                 result["message"] = f"Multiple fraud-related declines ({fraud_declines})"
+                result["escalated"] = True
 
         return result
 

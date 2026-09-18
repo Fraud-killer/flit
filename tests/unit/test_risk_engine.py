@@ -268,7 +268,7 @@ class TestHistoricalScoreIntegration:
         # 70% current + 30% historical
         combined = 0.7 * current_score + 0.3 * historical_avg
         
-        assert combined == 0.62
+        assert combined == pytest.approx(0.62)
     
     def test_no_historical_data(self):
         """Without historical data, use current score only."""

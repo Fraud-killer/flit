@@ -21,6 +21,8 @@ class TransactionEvent(BaseEvent):
         "visit_id",
         "kyc_level",
         "client_id",
+        "ip_address",
+        "user_agent",
         "currency_code",
         "current_cumulative_balance",
         "daily_cumulative_debit_balance",
@@ -78,5 +80,7 @@ class TransactionEvent(BaseEvent):
             and type(self.daily_cumulative_debit_balance) not in (int, float)
         ):
             errors.append(msg_void_or_decimal.new(path="daily_cumulative_debit_balance"))
+
+        errors.extend(self.verify_network_attrs())
 
         return errors

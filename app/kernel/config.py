@@ -39,9 +39,27 @@ class Config(metaclass=ConfigMeta):
 
         if value is None:
             debug = ctx.load.var("debug")[0]
-            value = '["*"]' if debug == True else "[]"
+            value = '["localhost", "127.0.0.1"]' if debug == True else "[]"
 
         return json.loads(value)
+
+    @variable
+    def secure_ssl_redirect(self, ctx):
+        value = ctx.load.env("SECURE_SSL_REDIRECT", True)
+        value, error = execute(to_bool, value)
+        if not error: return value
+        raise VariableError(msg_to_bool.text)
+
+    @variable
+    def geoip_db_path(self, ctx):
+        return ctx.load.env("GEOIP_DB_PATH")
+
+    @variable
+    def threat_list_url(self, ctx):
+        return ctx.load.env(
+            "THREAT_LIST_URL",
+            "https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset",
+        )
 
     @variable
     def static_url(self, ctx):
