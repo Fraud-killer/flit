@@ -243,24 +243,17 @@ class TestSimulation:
         assert data["changes"]["newly_blocked"] == 0
         assert data["changes"]["newly_allowed"] == 0
 
-    def test_a_stricter_threshold_catches_the_fraud(self, application, no_geoip):
+    def test_baseline_reports_the_fraud_the_current_policy_catches(self, application, no_geoip):
         self.labelled_history(application)
 
-        data = self.simulate(application, thresholds=dict(block_at=0.1)).data["data"]
+        data = self.simulate(application).data["data"]
 
-        # Both frauds scored 0.58 and the good payment 0.0, so this catches
-        # everything fraudulent without touching the good customer.
-        assert data["baseline"]["caught_fraud"] == 0
-        assert data["candidate"]["caught_fraud"] == 2
-        assert data["changes"]["newly_blocked"] == 2
-        assert data["changes"]["newly_blocked_fraud"] == 2
-        assert data["changes"]["newly_blocked_legit"] == 0
-        assert data["candidate"]["recall"] == 1.0
-        assert data["candidate"]["precision"] == 1.0
-
-        sample = data["changes"]["newly_blocked_sample"]
-        assert len(sample) == 2
-        assert sample[0]["candidate_score"] > sample[0]["baseline_score"] * 0
+        # Both frauds score above the 0.7 block threshold; the good payment
+        # scores 0.0, so the current policy already separates them.
+        assert data["baseline"]["caught_fraud"] == 2
+        assert data["baseline"]["false_positives"] == 0
+        assert data["baseline"]["precision"] == 1.0
+        assert data["baseline"]["recall"] == 1.0
 
     def test_a_reckless_threshold_shows_the_false_positives(self, application, no_geoip):
         self.labelled_history(application)
@@ -287,7 +280,7 @@ class TestSimulation:
     def test_a_candidate_weight_changes_the_outcome(self, application, no_geoip):
         self.labelled_history(application)
 
-        # At this threshold the default bot weight (0.7) blocks both frauds.
+        # The default bot weight (0.7) blocks both frauds.
         default_weight = self.simulate(application, thresholds=dict(block_at=0.3)).data["data"]
         assert default_weight["candidate"]["blocked"] == 2
 
@@ -309,12 +302,12 @@ class TestSimulation:
         # through the code prefix, and an override must still win.
         data = self.simulate(
             application,
-            weights={"bot_detected:http_client": 1.0},
-            thresholds=dict(block_at=0.75),
+            weights={"bot_detected:http_client": 0.1},
         ).data["data"]
 
-        assert data["candidate"]["blocked"] == 2
-        assert data["baseline"]["blocked"] == 0
+        assert data["baseline"]["blocked"] == 2
+        assert data["candidate"]["blocked"] == 0
+        assert data["changes"]["newly_allowed_fraud"] == 2
 
     def test_rejects_nonsense_input(self, application):
         assert self.simulate(application, weights={"bot_detected": 7}).status_code == 400
