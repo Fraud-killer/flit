@@ -2,6 +2,8 @@ import ipaddress
 from devkit import undefined
 from abc import ABCMeta, abstractmethod
 from devkit.checks import is_present, is_trimmed_str
+from devkit.checks import is_dense_str
+from devkit.messages import msg_void_or_dense_string
 from core.messages.networks import msg_void_or_ip_address, msg_void_or_user_agent
 
 
@@ -32,6 +34,13 @@ class BaseEvent(metaclass=ABCMeta):
 
     # ClientEvent.id identifies the client; TransactionEvent.id the transaction.
     account_id_is_event_id = False
+
+    def verify_visit_attrs(self):
+        """The visit token issued by /v1/collect, or Fingerprint's visit id."""
+        if is_present(self.visit_token) and not is_dense_str(self.visit_token):
+            return [msg_void_or_dense_string.new(path="visit_token")]
+
+        return []
 
     def verify_network_attrs(self):
         """Validate the optional end-user `ip_address` and `user_agent` attributes."""

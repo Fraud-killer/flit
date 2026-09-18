@@ -61,6 +61,28 @@ def application(db):
 
 
 @pytest.fixture
+def second_application(db):
+    """A second Application, to check one merchant cannot see another's data."""
+    from core.models import User, Organization, Application
+
+    user = User.objects.create_user(email="other@flit.io", password="x" * 12)
+    organization = Organization.objects.create(name="Other Org", owner=user)
+
+    return Application.objects.create(name="Other App", organization=organization)
+
+
+@pytest.fixture
+def no_geoip():
+    """No GeoIP databases, so IP lookups return nothing."""
+    from core.intelligence.ip_intelligence import GeoIPDatabase
+
+    previous = GeoIPDatabase._readers
+    GeoIPDatabase._readers = {}
+    yield
+    GeoIPDatabase._readers = previous
+
+
+@pytest.fixture
 def mock_cache():
     """Mock Django cache."""
     from unittest.mock import MagicMock, patch
