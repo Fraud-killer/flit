@@ -98,8 +98,12 @@ class AuditRecorder:
                 counterparty_key=cls.counterparty_key(event),
                 risk_level=risk_result.level.value,
                 recommendation=risk_result.recommendation,
+                # The decision FLIT reached, not what it was allowed to do
+                # with it: a shadow run has to produce the same history an
+                # enforcing one would, or measuring it later is meaningless.
                 should_block=risk_result.should_block,
                 should_challenge=risk_result.should_challenge,
+                enforcement=getattr(application, "enforcement", "shadow"),
                 coverage=risk_result.coverage,
                 rules=rule_names,
                 # The global identity keys this decision touched. Kept so that

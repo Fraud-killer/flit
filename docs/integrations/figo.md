@@ -62,7 +62,133 @@ failure this whole ladder exists to prevent.
 To get labels, post confirmed outcomes back through
 `POST /v1/applications/{id}/outcomes`, or resolve the cases FLIT opens.
 
-## Live integration
+## Going live
+
+### Start in shadow. It is the default.
+
+A new application is created in `shadow`: every decision is computed and
+recorded exactly as it would be in production, and none of it is acted on.
+`should_block` and `should_challenge` come back **false** — not flagged as
+unenforced, actually false — so an integration written as
+`if (decision.should_block) reject()` cannot turn a customer away during the
+shadow period even if someone forgets to check a second flag. What FLIT
+decided is reported alongside as `would_block` and `would_challenge`, and it
+is the decision that gets **recorded**, so the shadow period is measurable.
+
+Cases still open for review in shadow. A case costs a reviewer's attention,
+not a customer's signup, and reviewing is how the labels arrive that make
+enforcing defensible later.
+
+Flip when the numbers say so, not on a date:
+
+```python
+application.enforcement = "enforcing"
+application.save()
+```
+
+### The three calls
+
+```ts
+import { Flit, failOpen } from "./flit.mjs";
+
+const flit = new Flit({
+  baseUrl: process.env.FLIT_URL,
+  applicationId: process.env.FLIT_APPLICATION_ID,
+  secretKey: process.env.FLIT_SECRET_KEY,
+});
+```
+
+**1. Registration** — the surface FLIT is strongest on, and the one the
+September flood hit.
+
+```ts
+const decision = await failOpen(
+  flit.auditRegistration({
+    id: user.id,
+    client_id: user.id,
+    email: user.email,
+    country: user.country,
+    ip_address: req.ip,
+    user_agent: req.headers["user-agent"],
+    visit_token: body.flit_visit_token,   // from the browser SDK, if present
+    action: "registration",
+  }),
+  (error) => logger.warn({ error }, "flit unavailable"),
+);
+
+if (decision.should_block) return reject();
+if (decision.should_challenge) return stepUp();
+```
+
+**2. Transaction** — every deposit, withdrawal and card spend.
+
+```ts
+await failOpen(flit.auditTransaction({
+  id: transaction.id,
+  client_id: transaction.user_id,
+  type: transaction.type === "deposit" ? "credit" : "debit",
+  amount: transaction.amount / 100,        // FLIT takes major units
+  currency_code: transaction.currency,
+  chain: transaction.chain,
+  asset: transaction.asset,
+  counterparty_address: cryptoDestination,  // recipient.account_number when channel is CRYPTO
+  ip_address: req.ip,
+  user_agent: req.headers["user-agent"],
+}));
+```
+
+**3. Outcome** — whenever a dispute, chargeback or confirmed fraud lands.
+This is the one that matters most and the one that is easiest to skip: it is
+what fills the evidence ledger and what the shared network learns from.
+
+```ts
+await failOpen(flit.reportOutcome({ event_id: transaction.id, label: "fraud" }));
+```
+
+### Fail open, always
+
+`failOpen` returns an inert decision — nothing blocked, nothing challenged —
+if FLIT is slow, down or misconfigured. A fraud decision that has not arrived
+is not a reason to turn away a real customer. Every call site should go
+through it.
+
+Decision latency measured locally over 200 registrations: **p50 7.5ms, p95
+8.7ms, p99 11.5ms**, on SQLite with a cold cache. Add network and Postgres
+and it stays comfortably inside a 2s timeout, but the timeout is what
+protects the signup path, not the average.
+
+### The browser SDK
+
+Add `sdk/js` to the web app and pass the returned `visit_token` on the
+registration call. Without it FLIT falls back down the identity ladder to
+email root and IP — which works, and is weaker. Once enough of Figo's traffic
+carries a device key, `ExpectedSignalRule` will correctly start flagging the
+signups that do not.
+
+### Schedule these
+
+```bash
+python manage.py refresh_sanctions   # daily, alert on failure
+python manage.py expire_challenges   # every few minutes
+```
+
+### When to turn enforcement on
+
+Not on a date — on evidence. After a few weeks of shadow, ask the decision
+feed:
+
+1. **What would have been blocked, and were any of them good customers?**
+   `GET /decisions?days=30` against known-good accounts is the false-positive
+   rate FLIT would have imposed. If it is not acceptable, tune thresholds
+   before enforcing, not after.
+2. **Did the rules that fired have lift?** Run the backtest over the shadow
+   period, now with real per-transaction labels from reported outcomes rather
+   than the blocked-user proxy.
+3. **Start with `challenge`, not `block`.** Raising `block_at` above what the
+   data supports while leaving `challenge_at` where it is gets most of the
+   protection at a fraction of the customer cost.
+
+## Live integration reference
 
 Three calls, in the order they matter:
 

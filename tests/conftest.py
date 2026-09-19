@@ -64,7 +64,12 @@ def application(db):
     user = User.objects.create_user(email="owner@flit.io", password="x" * 12)
     organization = Organization.objects.create(name="Test Org", owner=user)
 
-    return Application.objects.create(name="Test App", organization=organization)
+    # Enforcing, because most tests are about what FLIT *decides*. A real
+    # application starts in shadow; the shadow semantics have their own tests
+    # in test_enforcement.py.
+    return Application.objects.create(
+        name="Test App", organization=organization, enforcement="enforcing",
+    )
 
 
 @pytest.fixture
@@ -75,7 +80,9 @@ def second_application(db):
     user = User.objects.create_user(email="other@flit.io", password="x" * 12)
     organization = Organization.objects.create(name="Other Org", owner=user)
 
-    return Application.objects.create(name="Other App", organization=organization)
+    return Application.objects.create(
+        name="Other App", organization=organization, enforcement="enforcing",
+    )
 
 
 @pytest.fixture

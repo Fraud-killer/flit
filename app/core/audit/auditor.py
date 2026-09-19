@@ -173,6 +173,20 @@ class Auditor:
                 rule_names=rule_names,
             )
 
+        # In shadow, `should_block` and `should_challenge` come back false —
+        # not merely flagged as unenforced. An integration reads
+        # `if (decision.should_block) reject()`, so the field that drives that
+        # branch has to be the safe one; anything else means a shadow
+        # deployment turns customers away the first time someone forgets to
+        # check a second flag. What FLIT actually decided is reported
+        # alongside as `would_block`, and it is the decision that gets
+        # recorded, so history and the evidence ledger stay honest.
+        # Safe default: anything that cannot tell us it is enforcing is
+        # treated as shadow, so a misconfiguration suppresses actions rather
+        # than taking them.
+        application = policy.application
+        enforcing = bool(getattr(application, "is_enforcing", False))
+
         return Struct(
             audit_id=str(audit_log.id) if audit_log else None,
             device_id=str(scope.device_identity.id) if scope.device_identity else None,
@@ -181,9 +195,14 @@ class Auditor:
             risk_level=risk_result.level.value,
             rules=rule_names,
             reasons=reasons,
-            should_block=risk_result.should_block,
+            enforcement=getattr(application, "enforcement", "shadow"),
+            should_block=risk_result.should_block and enforcing,
+            should_challenge=risk_result.should_challenge and enforcing,
+            # Review is internal: a case in a queue costs a reviewer's
+            # attention, not a customer's signup, so it happens in shadow too.
             should_review=risk_result.should_review,
-            should_challenge=risk_result.should_challenge,
+            would_block=risk_result.should_block,
+            would_challenge=risk_result.should_challenge,
             recommendation=risk_result.recommendation,
             confidence=risk_result.confidence,
             coverage=risk_result.coverage,
