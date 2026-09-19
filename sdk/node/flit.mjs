@@ -14,9 +14,9 @@
  * implementation against the Python one, including that case.
  */
 
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 
-const NON_ASCII = /[-￿]/g;
+const NON_ASCII = /[\u0080-\uFFFF]/g;
 
 function escapeNonAscii(text) {
   return text.replace(
@@ -92,13 +92,24 @@ export class Flit {
   }
 
   async post(path, body) {
-    const timestamp = String(Date.now());
+    // Seconds, not milliseconds. The replay-protection middleware compares
+    // this against its own clock in seconds, so Date.now() lands roughly
+    // fifty thousand years in the future and every request is rejected as a
+    // replay. Signature parity tests cannot catch this: they pin a fixed
+    // timestamp, so both sides agree on the same wrong value.
+    const timestamp = String(Math.floor(Date.now() / 1000));
+
+    // Replay protection also requires a nonce, unique per application and
+    // between 16 and 64 characters. It is remembered server-side for the
+    // tolerance window, so it must be fresh on every request.
+    const nonce = randomBytes(16).toString("hex");
 
     const response = await fetch(this.baseUrl + path, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-Timestamp": timestamp,
+        "X-Nonce": nonce,
         Authorization: signature({
           applicationId: this.applicationId,
           secretKey: this.secretKey,
