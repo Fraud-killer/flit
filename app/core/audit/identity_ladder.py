@@ -17,16 +17,17 @@ from typing import List, Optional
 from core.identity_keys import IdentityKeyType
 
 
-# What a well-behaved browser session is expected to produce. Coverage is
-# measured against this, and a shortfall is itself evidence (see
-# ExpectedSignalRule).
-# Weighted so that no combination of the weaker keys can reach the score a
-# device alone gives: coverage below 0.5 means the device key is missing, and
-# above it means the device key is present. That keeps the number readable.
 # Distinguishes "no network node" from "not specified" when adding a rung.
 SAME_AS_KEY = object()
 
 
+# What a well-behaved browser session is expected to produce. Coverage is
+# measured against this, and a shortfall is itself evidence (see
+# ExpectedSignalRule). Weighted so that no combination of the weaker keys can
+# reach the score a device alone gives: coverage below 0.5 means the device
+# key is missing, above it means the device key is present. That keeps the
+# number readable. The wallet rung is not counted here — a crypto platform
+# sees one only on funding events, so its absence says nothing.
 EXPECTED_KEY_WEIGHTS = {
     IdentityKeyType.DEVICE: 0.6,
     IdentityKeyType.EMAIL_ROOT: 0.15,
@@ -66,6 +67,11 @@ class IdentityLadder:
     """Every key FLIT could resolve for one event, strongest first."""
 
     rungs: List[IdentityRung] = field(default_factory=list)
+
+    # The IdentityKey for a withdrawal destination, when the event had one.
+    # Held beside the ladder rather than on it, because it says where money
+    # went and not who sent it.
+    counterparty_key: object = None
 
     def add(self, key_type: str, value: str, key=None, network_key=SAME_AS_KEY):
         if not value:

@@ -63,6 +63,9 @@ class AccountActivity:
             currency_code=context.get("currency_code"),
             counterparty_id=context.get("counterparty_id"),
             device_id=context.get("device_id"),
+            chain=context.get("chain"),
+            asset=context.get("asset"),
+            counterparty_key=context.get("counterparty_key"),
             label=log.label,
         )
 
@@ -79,6 +82,19 @@ class AccountActivity:
 
     def counterparties(self, events):
         return {event["counterparty_id"] for event in events if event["counterparty_id"]}
+
+    def crypto(self, events):
+        """Events that moved value on a chain."""
+        return [event for event in events if event.get("chain")]
+
+    def withdrawal_addresses(self, events=None):
+        """Every destination this account has sent to, as correlation keys."""
+        events = self.events if events is None else events
+
+        return {
+            event["counterparty_key"] for event in events
+            if event.get("counterparty_key") and event.get("type") == DEBIT
+        }
 
     @property
     def last_activity_at(self):

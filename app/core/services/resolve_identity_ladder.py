@@ -17,7 +17,7 @@ from django.db.models import F
 from django.utils import timezone
 
 from core.audit.identity_ladder import IdentityLadder
-from core.intelligence import email_intelligence
+from core.intelligence import email_intelligence, wallet_intelligence
 from core.models.identity import IdentityKey, IdentityKeyType, IdentityAccountLink
 
 
@@ -67,7 +67,9 @@ def _resolve(ladder, key_type, value, preview, application, client_id, write):
 class ResolveIdentityLadder:
     @classmethod
     def call(cls, *, application, client_id, device_identity=None, email=None,
-             ip_address=None, asn=None, signature_hash=None, write=True):
+             ip_address=None, asn=None, signature_hash=None,
+             wallet_address=None, chain=None, counterparty_address=None,
+             write=True):
         ladder = IdentityLadder()
 
         # The device rung stores no links of its own: they already live in
@@ -95,6 +97,14 @@ class ResolveIdentityLadder:
                 (IdentityKeyType.SIGNATURE, signature_hash, f"sig:{signature_hash[:12]}")
             )
 
+        if wallet_address:
+            key = wallet_intelligence.address_key(wallet_address, chain)
+            if key:
+                rungs.append((
+                    IdentityKeyType.WALLET, key,
+                    wallet_intelligence.redact(wallet_address),
+                ))
+
         if email:
             root = email_intelligence.normalize_email(email)
             if root:
@@ -110,6 +120,26 @@ class ResolveIdentityLadder:
 
         for key_type, value, preview in rungs:
             _resolve(ladder, key_type, value, preview, application, client_id, write)
+
+        # Recorded, never laddered: a destination address identifies where
+        # money went, not who sent it. CollectionWalletRule counts the
+        # accounts behind one address using these links.
+        if counterparty_address:
+            key_value = wallet_intelligence.address_key(counterparty_address, chain)
+            if key_value:
+                ladder.counterparty_key = _global_key(
+                    IdentityKeyType.COUNTERPARTY, key_value,
+                    wallet_intelligence.redact(counterparty_address), write,
+                )
+                if write and ladder.counterparty_key and client_id:
+                    link, _ = IdentityAccountLink.objects.get_or_create(
+                        identity_key=ladder.counterparty_key,
+                        application=application, client_id=client_id,
+                    )
+                    IdentityAccountLink.objects.filter(pk=link.pk).update(
+                        event_count=F("event_count") + 1,
+                        last_seen_at=timezone.now(),
+                    )
 
         return ladder
 
@@ -128,6 +158,9 @@ async def resolve_identity_ladder(
 
     ip_address = event_value(event, "ip_address") or getattr(visit, "ip", None)
     email = event_value(event, "email")
+    wallet_address = event_value(event, "wallet_address")
+    counterparty_address = event_value(event, "counterparty_address")
+    chain = event_value(event, "chain")
     asn = getattr(visit, "asn", None)
     signature_hash = getattr(visit, "signature_hash", None)
 
@@ -151,6 +184,9 @@ async def resolve_identity_ladder(
             ip_address=ip_address,
             asn=asn,
             signature_hash=signature_hash,
+            wallet_address=wallet_address,
+            chain=chain,
+            counterparty_address=counterparty_address,
             write=write,
         )
     except Exception:
@@ -164,6 +200,8 @@ async def resolve_identity_ladder(
 
         for key_type, value in (
             (IdentityKeyType.DEVICE, getattr(device_identity, "external_id", None)),
+            (IdentityKeyType.WALLET,
+             wallet_intelligence.address_key(wallet_address or "", chain)),
             (IdentityKeyType.EMAIL_ROOT, email_intelligence.normalize_email(email or "")),
             (IdentityKeyType.IP, ip_address),
             (IdentityKeyType.ASN, asn),

@@ -18,16 +18,25 @@ class IdentityKeyType:
 
     DEVICE = "device"
     SIGNATURE = "signature"
+    WALLET = "wallet"
     EMAIL_ROOT = "email_root"
     IP = "ip"
     ASN = "asn"
 
+    # Where funds were sent. Recorded so that many accounts paying one
+    # address can be counted, but never placed on the ladder: a withdrawal
+    # destination is routinely shared by thousands of unrelated customers,
+    # and treating it as identity would merge all of them.
+    COUNTERPARTY = "counterparty"
+
     CHOICES = [
         (DEVICE, "Device identity"),
         (SIGNATURE, "Device signature"),
+        (WALLET, "Wallet address"),
         (EMAIL_ROOT, "Normalised email"),
         (IP, "IP address"),
         (ASN, "Autonomous system"),
+        (COUNTERPARTY, "Counterparty address"),
     ]
 
     # How much a correlation found on this key is worth. A device match is
@@ -37,6 +46,12 @@ class IdentityKeyType:
     CONFIDENCE = {
         DEVICE: 1.0,
         SIGNATURE: 0.8,
+        # A wallet the user controls is a strong key and, unlike a device, it
+        # survives a new phone and follows them between platforms. It sits
+        # below a device only because a merchant can be wrong about whose
+        # wallet it is. A withdrawal *destination* is never an identity key —
+        # see core.intelligence.wallet_intelligence.
+        WALLET: 0.75,
         EMAIL_ROOT: 0.6,
         IP: 0.5,
         ASN: 0.35,

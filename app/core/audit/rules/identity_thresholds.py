@@ -14,7 +14,10 @@ from core.identity_keys import IdentityKeyType as Key
 # carries every real signup in a market — counting on it would flag an entire
 # country. The ASN rung stays on the ladder for reputation and coverage; it is
 # just not a correlation key.
-NON_CORRELATING_KEYS = {Key.ASN}
+# A counterparty address is here for the same reason, from the other side: it
+# is recorded so CollectionWalletRule can count the accounts paying into one
+# address, but it never identifies the sender.
+NON_CORRELATING_KEYS = {Key.ASN, Key.COUNTERPARTY}
 
 
 DEFAULT_IDENTITY_THRESHOLDS = {
@@ -22,6 +25,9 @@ DEFAULT_IDENTITY_THRESHOLDS = {
     "new_accounts_per_day": {
         Key.DEVICE: 3,
         Key.SIGNATURE: 4,
+        # A person may legitimately fund two accounts from one wallet; ten in
+        # a day is a farm paying for its own signups.
+        Key.WALLET: 2,
         Key.EMAIL_ROOT: 2,
         # Deliberately generous: carrier-grade NAT puts a whole mobile market
         # behind a handful of addresses, and an IP breach alone is scored at
@@ -32,6 +38,7 @@ DEFAULT_IDENTITY_THRESHOLDS = {
     "max_accounts": {
         Key.DEVICE: 3,
         Key.SIGNATURE: 4,
+        Key.WALLET: 3,
         Key.EMAIL_ROOT: 2,
         Key.IP: 15,
     },

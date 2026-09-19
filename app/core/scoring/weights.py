@@ -66,6 +66,14 @@ class RiskWeights:
     plus_tagged_email: float = 0.1
     domain_cannot_receive_mail: float = 0.6
     newly_registered_domain: float = 0.35
+    # Crypto rails. An on-chain transfer is final, so the cost of being wrong
+    # runs the other way from card: a missed cash-out is unrecoverable, while
+    # a challenged one costs the customer a minute.
+    crypto_cash_out: float = 0.7
+    # A new destination is ordinary on its own. It is weighted to matter only
+    # alongside something else, which is when it means a takeover.
+    new_withdrawal_address: float = 0.45
+    collection_wallet: float = 0.8
     # Corroboration from other merchants: the one kind of evidence that did
     # not come from the merchant being protected. Weighted so that the
     # k-anonymity floor of two contributors lands on a challenge and further
@@ -173,6 +181,9 @@ class RiskWeights:
             "plus_tagged_email": self.plus_tagged_email,
             "domain_cannot_receive_mail": self.domain_cannot_receive_mail,
             "newly_registered_domain": self.newly_registered_domain,
+            "crypto_cash_out": self.crypto_cash_out,
+            "new_withdrawal_address": self.new_withdrawal_address,
+            "collection_wallet": self.collection_wallet,
             "network_fraud_history": self.network_fraud_history,
             "challenge_evasion": self.challenge_evasion,
             "req_event_attrs": self.req_event_attrs,

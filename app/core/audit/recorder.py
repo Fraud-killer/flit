@@ -90,6 +90,12 @@ class AuditRecorder:
                 transaction_type=cls.value(event, "type"),
                 counterparty_id=cls.value(event, "counterparty_id"),
                 card_fingerprint=cls.value(event, "card_fingerprint"),
+                # Crypto movement, recorded as the normalised correlation key
+                # rather than the raw address, so history compares the way the
+                # identity ladder does.
+                chain=cls.value(event, "chain"),
+                asset=cls.value(event, "asset"),
+                counterparty_key=cls.counterparty_key(event),
                 risk_level=risk_result.level.value,
                 recommendation=risk_result.recommendation,
                 should_block=risk_result.should_block,
@@ -111,6 +117,20 @@ class AuditRecorder:
                     for factor in risk_result.factors
                 ],
             ),
+        )
+
+    @staticmethod
+    def counterparty_key(event):
+        """The normalised key for where funds were sent, if anywhere."""
+        from core.intelligence import wallet_intelligence
+
+        address = AuditRecorder.value(event, "counterparty_address")
+
+        if not address:
+            return None
+
+        return wallet_intelligence.address_key(
+            address, AuditRecorder.value(event, "chain"),
         )
 
     @staticmethod

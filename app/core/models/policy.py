@@ -28,6 +28,8 @@ class Policy(models.Model):
     # Overrides for core.audit.rules.identity_thresholds.DEFAULT_IDENTITY_THRESHOLDS,
     # merged one level deep so a single ladder key can be retuned on its own.
     identity_thresholds = models.JSONField(default=get_device_thresholds_default, blank=True)
+    # Overrides for core.audit.rules.crypto_thresholds.DEFAULT_CRYPTO_THRESHOLDS
+    crypto_thresholds = models.JSONField(default=get_device_thresholds_default, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

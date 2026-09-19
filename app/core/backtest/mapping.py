@@ -39,6 +39,18 @@ EVENT_FIELDS = [
     "status",
     "current_cumulative_balance",
     "daily_cumulative_debit_balance",
+    # Payment-rule fields: not declared event attributes, so they travel in
+    # `extra` and are read by the card testing and gateway pattern rules.
+    "gateway_message",
+    "card_fingerprint",
+    "card_bin",
+    # Crypto rails. Optional: only the crypto rules read them, and an export
+    # without them replays exactly as before.
+    "chain",
+    "asset",
+    "wallet_address",
+    "counterparty_address",
+    "transaction_hash",
 ]
 
 # Columns FLIT can use for device identity when there is no Fingerprint visit.

@@ -167,3 +167,52 @@ class TestVerifyingAChallenge:
         )
 
         assert response.status_code != 200
+
+
+class TestAuditModes:
+    """
+    The signup-surface rules are only worth having if a merchant can reach
+    them. RegistrationEvent existed and was tested for a while before it was
+    routable, which made the whole surface unreachable over HTTP.
+    """
+
+    def audit(self, client, application, mode, payload):
+        return client.post(
+            f"/api/v1/applications/{application.id}/audit-{mode}",
+            payload, format="json",
+        )
+
+    def test_a_registration_can_be_audited_over_the_api(self, application):
+        response = self.audit(
+            client_for(application), application, "registration",
+            dict(
+                id="signup_1",
+                email="figopentest563d42fd@uberip.com",
+                country="NG",
+                ip_address="193.200.229.243",
+                user_agent="curl/8.20.0",
+            ),
+        )
+
+        assert response.status_code == 200
+        assert "disposable_email_domain" in body(response)["factors"]
+
+    def test_a_crypto_transfer_can_be_audited_over_the_api(self, application):
+        response = self.audit(
+            client_for(application), application, "transaction",
+            dict(
+                id="tx_1", type="debit", amount=100, currency_code="USD",
+                client_id="user_1", chain="polygon", asset="USDC",
+                counterparty_address="0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+            ),
+        )
+
+        assert response.status_code == 200
+
+    def test_an_unknown_mode_lists_what_is_available(self, application):
+        response = self.audit(
+            client_for(application), application, "telepathy", dict(id="x"),
+        )
+
+        assert response.status_code != 200
+        assert "registration" in str(response.json())

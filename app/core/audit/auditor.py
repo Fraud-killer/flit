@@ -49,6 +49,10 @@ class Auditor:
         rules.DisposableEmailRule,
         rules.EmailPatternRule,
         rules.DomainReputationRule,
+        # Crypto Rails
+        rules.CryptoCashOutRule,
+        rules.NewWithdrawalAddressRule,
+        rules.CollectionWalletRule,
         # Shared Protection Network
         rules.NetworkReputationRule,
         rules.ChallengeEvasionRule,

@@ -29,6 +29,18 @@ class TransactionEvent(BaseEvent):
         "currency_code",
         "current_cumulative_balance",
         "daily_cumulative_debit_balance",
+        # Crypto movements are transactions, so they carry the same rules —
+        # velocity, pass-through, structuring, limits — rather than needing a
+        # parallel event type. These attributes are optional and only the
+        # crypto rules require them.
+        "chain",
+        "asset",
+        # The wallet the account controls. Becomes an identity-ladder rung.
+        "wallet_address",
+        # Where funds were sent. Never an identity key: a withdrawal
+        # destination is routinely shared by thousands of unrelated customers.
+        "counterparty_address",
+        "transaction_hash",
     ]
 
     def verify(self, policy=None):
