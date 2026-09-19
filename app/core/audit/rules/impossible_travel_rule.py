@@ -5,9 +5,15 @@ from devkit.message import Message
 from core.audit.events import TransactionEvent
 from core.audit.rules.base_rule import BaseRule
 from core.audit.lock_cache import lockcache, LockCache
+from .base_rule import Maturity, RuleKind
 
 
 class ImpossibleTravelRule(BaseRule, LockCache):
+
+    techniques = ("F1030",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.PROPOSED
+
     MAX_TRAVEL_SPEED_KMH = 900
     MIN_TIME_BETWEEN_EVENTS_SECONDS = 60
 
@@ -161,6 +167,11 @@ class ImpossibleTravelRule(BaseRule, LockCache):
 
 
 class AccountTakeoverRule(BaseRule, LockCache):
+
+    techniques = ("F1006", "F1005")
+    kind = RuleKind.DETECTION
+    maturity = Maturity.PROPOSED
+
     @property
     def applies(self):
         return isinstance(self.event, TransactionEvent)

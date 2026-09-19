@@ -8,6 +8,7 @@ brute-force attacks on payment systems.
 from typing import Any
 from datetime import datetime, timedelta
 from .payment_rule import PaymentRule
+from .base_rule import Maturity, RuleKind
 
 
 class RetryAttackRule(PaymentRule):
@@ -20,6 +21,11 @@ class RetryAttackRule(PaymentRule):
     - Same IP cycling through many cards
     - Exponential retry patterns (automated)
     """
+
+    techniques = ("F1012",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.PROPOSED
+
     
     trigger_fields = ("payment_instrument",)
 

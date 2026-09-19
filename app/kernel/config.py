@@ -75,6 +75,26 @@ class Config(metaclass=ConfigMeta):
         return ctx.load.env("FINGERPRINT_MANAGEMENT_API_KEY")
 
     @variable
+    def turnstile_secret_key(self, ctx):
+        """
+        Fallback Cloudflare Turnstile secret, used when an application has not
+        configured its own. Most deployments set it per application instead.
+        """
+        return ctx.load.env("TURNSTILE_SECRET_KEY")
+
+    @variable
+    def domain_lookups_enabled(self, ctx):
+        """
+        Whether DomainIntelligence may make outbound DNS-over-HTTPS and RDAP
+        calls. On by default; deployments with no egress turn it off, and the
+        test suite disables it so nothing reaches the network.
+        """
+        value = ctx.load.env("DOMAIN_LOOKUPS_ENABLED", True)
+        value, error = execute(to_bool, value)
+        if not error: return value
+        raise VariableError(msg_to_bool.text)
+
+    @variable
     def redis_url(self, ctx):
         return ctx.load.env("REDIS_URL", "redis://localhost:6379/0")
 

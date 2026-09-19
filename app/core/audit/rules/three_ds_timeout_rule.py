@@ -8,6 +8,7 @@ complete human verification challenges.
 
 from typing import Any
 from .payment_rule import PaymentRule
+from .base_rule import Maturity, RuleKind
 
 
 class ThreeDSTimeoutRule(PaymentRule):
@@ -21,6 +22,12 @@ class ThreeDSTimeoutRule(PaymentRule):
     
     High 3DS timeout rates strongly correlate with fraud.
     """
+
+    techniques = ("F1001", "F1039")
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_fraud_rules.py::TestThreeDSTimeoutRule"
+
     
     trigger_fields = ("gateway_message", "provider_responses")
 

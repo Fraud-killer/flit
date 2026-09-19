@@ -17,7 +17,12 @@ from core.services.describe_account import DescribeAccount
 from api.parsers import parse_account_lookup_inputs
 from core.services.simulate_policy import SimulatePolicy
 from api.parsers import parse_decision_filters, parse_case_inputs, parse_simulation_inputs
+from api.parsers import parse_challenge_inputs, parse_challenge_verification
 from api.serializers.case_serializers import serialize_case
+from api.serializers.challenge_serializers import serialize_challenge
+from core.services.publish_outcome import PublishOutcome
+from core.services.challenges import ChallengeError, IssueChallenge, VerifyChallenge
+from core.messages.challenges import msg_challenge_unavailable
 from core.messages.devices import msg_no_query_id_device
 from api.serializers.device_serializers import DeviceSerializer
 from core.services.create_device_by_query_id import CreateDeviceByQueryId, QueryIdDeviceNotFound
@@ -82,6 +87,10 @@ class ApplicationViewSet(ViewSet):
         audit_log.labeled_at = timezone.now()
         audit_log.save(update_fields=["label", "labeled_at"])
 
+        # A reported outcome is ground truth. Publishing it is what lets the
+        # rest of the network learn from this merchant's experience.
+        PublishOutcome.call(audit_log=audit_log, application=inputs.application)
+
         return build_api_response(
             data=dict(
                 audit_id=str(audit_log.id),
@@ -89,6 +98,69 @@ class ApplicationViewSet(ViewSet):
                 label=audit_log.label,
                 labeled_at=audit_log.labeled_at,
             )
+        )
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.POST],
+        url_path=r"challenges",
+    )
+    def challenges(self, request, pk):
+        """
+        Issue a step-up challenge for an actor a decision asked to verify.
+
+        For an OTP the code comes back exactly once, in this response, and
+        FLIT keeps only its digest. Delivering it is the merchant's job: they
+        own the channel to their user and the relationship that makes a
+        message from them trustworthy.
+        """
+        inputs, errors = parse_challenge_inputs(pk, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        challenge, code = IssueChallenge.call(
+            application=inputs.application,
+            client_id=inputs.client_id,
+            method=inputs.method,
+            audit_log=inputs.audit_log,
+            identity_key_ids=inputs.identity_key_ids,
+        )
+
+        return build_api_response(
+            data=dict(challenge=serialize_challenge(challenge, code=code)),
+        )
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.POST],
+        url_path=r"challenges/(?P<challenge_id>[^/.]+)/verify",
+    )
+    def verify_challenge(self, request, pk, challenge_id=None):
+        inputs, errors = parse_challenge_verification(pk, challenge_id, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        try:
+            challenge, passed, reason = async_to_sync(VerifyChallenge.call)(
+                challenge=inputs.challenge,
+                response=inputs.response,
+                remote_ip=inputs.remote_ip,
+            )
+        except ChallengeError as error:
+            return build_api_response(
+                errors=[msg_challenge_unavailable.new(
+                    path="response", context=dict(detail=str(error)),
+                )],
+            )
+
+        return build_api_response(
+            data=dict(
+                passed=passed,
+                reason=reason,
+                challenge=serialize_challenge(challenge),
+            ),
         )
 
     @action(

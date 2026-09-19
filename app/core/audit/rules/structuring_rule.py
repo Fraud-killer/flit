@@ -1,7 +1,7 @@
 from devkit.message import Message
 from core.audit.events import TransactionEvent
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 from .mule_thresholds import get_mule_thresholds
 
 
@@ -14,6 +14,11 @@ class StructuringRule(BaseRule):
     from the optional `counterparty_id` on the event; without it this rule
     still counts credit volume.
     """
+
+    techniques = ("F1045",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_mule_detection.py::TestStructuringRule"
 
     @property
     def applies(self):

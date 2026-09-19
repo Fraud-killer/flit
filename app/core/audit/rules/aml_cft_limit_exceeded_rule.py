@@ -1,12 +1,17 @@
 from devkit.message import Message
 from core.money import Money, init_money
 from .money_limits import currency_mismatch
+from .base_rule import Maturity, RuleKind
 from core.audit.events import TransactionEvent
 
 from core.audit.rules.base_rule import BaseRule
 
 
 class AmlCftLimitExceededRule(BaseRule):
+
+    kind = RuleKind.CONTROL
+    maturity = Maturity.PROPOSED
+
     @property
     def applies(self):
         return isinstance(self.event, TransactionEvent)

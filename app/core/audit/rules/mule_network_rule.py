@@ -2,9 +2,9 @@ from asgiref.sync import sync_to_async
 from devkit.message import Message
 from core.models import AuditLog, DeviceAccountLink
 from core.audit.models import AuditLogLabel
-from core.audit.events import ClientEvent, TransactionEvent
+from core.audit.events import SIGNAL_EVENTS
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 from .mule_thresholds import get_mule_thresholds
 
 
@@ -21,10 +21,15 @@ class MuleNetworkRule(BaseRule):
     the rest of the set is visible.
     """
 
+    techniques = ("F1047",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_mule_detection.py::TestMuleNetworkRule"
+
     @property
     def applies(self):
         return (
-            isinstance(self.event, (ClientEvent, TransactionEvent))
+            isinstance(self.event, SIGNAL_EVENTS)
             and self.event.account_id is not None
             and self.scope.device_identity is not None
         )

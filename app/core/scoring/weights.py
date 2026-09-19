@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 
+from core.identity_keys import IdentityKeyType
+
 
 @dataclass
 class RiskWeights:
@@ -51,6 +53,26 @@ class RiskWeights:
     dormant_account_activity: float = 0.5
     account_farming: float = 0.8
     mule_network_device: float = 0.9
+    # Signup surface. An event producing none of the identity signal this
+    # merchant's own traffic normally produces — see ExpectedSignalRule.
+    missing_expected_device_signal: float = 0.55
+    reserved_email_domain: float = 0.7
+    disposable_email_domain: float = 0.6
+    generated_email_local_part: float = 0.65
+    adversarial_email_local_part: float = 0.5
+    # Ordinary hygiene for real users. It earns its keep on the identity
+    # ladder, where the tag is collapsed so several tagged signups resolve to
+    # one mailbox, not from its weight here.
+    plus_tagged_email: float = 0.1
+    domain_cannot_receive_mail: float = 0.6
+    newly_registered_domain: float = 0.35
+    # Corroboration from other merchants: the one kind of evidence that did
+    # not come from the merchant being protected. Weighted so that the
+    # k-anonymity floor of two contributors lands on a challenge and further
+    # corroboration escalates to a block — the network gets an actor verified,
+    # not turned away, until more than the minimum of it agrees.
+    network_fraud_history: float = 0.7
+    challenge_evasion: float = 0.7
     # Data completeness, not evidence of fraud: reported, never scored.
     req_event_attrs: float = 0.0
 
@@ -63,6 +85,9 @@ class RiskWeights:
         "authentication": 0.8,
         "device": 0.7,
         "account": 0.9,
+        # Registration abuse is the thing this category exists to catch, so
+        # it is not discounted.
+        "registration": 1.0,
     })
 
     time_decay_hours: float = 24.0
@@ -78,6 +103,18 @@ class RiskWeights:
 
         if rule_code.startswith("bot_detected:"):
             return self.bot_detected
+
+        # Correlation findings name the ladder rung they were found on, e.g.
+        # `account_farming:ip`. The same shape is worth less on a weaker key,
+        # so the base weight is scaled by that key's confidence rather than
+        # each combination needing its own entry.
+        for name, base in (
+            ("account_farming", self.account_farming),
+            ("multi_accounting", self.multi_accounting),
+        ):
+            if rule_code.startswith(f"{name}:"):
+                key_type = rule_code.split(":", 1)[1]
+                return round(base * IdentityKeyType.confidence(key_type), 4)
 
         weight_map = {
             "device_expired": self.device_expired,
@@ -128,6 +165,16 @@ class RiskWeights:
             "dormant_account_activity": self.dormant_account_activity,
             "account_farming": self.account_farming,
             "mule_network_device": self.mule_network_device,
+            "missing_expected_device_signal": self.missing_expected_device_signal,
+            "reserved_email_domain": self.reserved_email_domain,
+            "disposable_email_domain": self.disposable_email_domain,
+            "generated_email_local_part": self.generated_email_local_part,
+            "adversarial_email_local_part": self.adversarial_email_local_part,
+            "plus_tagged_email": self.plus_tagged_email,
+            "domain_cannot_receive_mail": self.domain_cannot_receive_mail,
+            "newly_registered_domain": self.newly_registered_domain,
+            "network_fraud_history": self.network_fraud_history,
+            "challenge_evasion": self.challenge_evasion,
             "req_event_attrs": self.req_event_attrs,
         }
         if rule_code in weight_map:
@@ -145,6 +192,11 @@ class RiskThresholds:
 
     block_at: float = 0.7
     review_at: float = 0.5
+    # Step-up verification. Sits below review because automated friction is
+    # cheap enough to apply more widely than a human's attention, and it is
+    # the right answer where evidence is real but thin — most of the signup
+    # surface.
+    challenge_at: float = 0.45
 
 
 DEFAULT_WEIGHTS = RiskWeights()

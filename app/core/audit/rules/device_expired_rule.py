@@ -3,10 +3,15 @@ from devkit.message import Message
 from core.audit.events import ClientEvent, TransactionEvent
 from core.messages.devices import msg_query_dvc_unregistered
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 
 
 class DeviceExpiredRule(BaseRule):
+
+    techniques = ("F1006",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.PROPOSED
+
     @property
     def applies(self):
         return (

@@ -2,9 +2,9 @@ from django.utils import timezone
 from asgiref.sync import sync_to_async
 from devkit.message import Message
 from core.models import DeviceAccountLink
-from core.audit.events import ClientEvent, TransactionEvent
+from core.audit.events import SIGNAL_EVENTS
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 from .device_thresholds import get_device_thresholds, scaled_score, DAY, HOUR
 
 
@@ -15,10 +15,15 @@ class AccountSharingRule(BaseRule):
     several within a day suggests account sharing.
     """
 
+    techniques = ("F1006", "T1585")
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_device_graph.py::TestAccountSharingRule"
+
     @property
     def applies(self):
         return (
-            isinstance(self.event, (ClientEvent, TransactionEvent))
+            isinstance(self.event, SIGNAL_EVENTS)
             and self.event.account_id is not None
         )
 

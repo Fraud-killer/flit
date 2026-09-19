@@ -1,8 +1,8 @@
 from devkit.message import Message
-from core.audit.events import ClientEvent, TransactionEvent
+from core.audit.events import SIGNAL_EVENTS
 from core.intelligence.bot_detection import BotDetector
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 from .visit_signals import fetch_visit_signals, event_value
 
 
@@ -12,9 +12,14 @@ class BotSignalRule(BaseRule):
     bot detection for its `visit_id`. Known good crawlers are not flagged.
     """
 
+    techniques = ("F1002",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_intelligence.py::TestBotSignalRule"
+
     @property
     def applies(self):
-        return isinstance(self.event, (ClientEvent, TransactionEvent)) and (
+        return isinstance(self.event, SIGNAL_EVENTS) and (
             event_value(self.event, "user_agent") is not None
             or event_value(self.event, "visit_id") is not None
         )

@@ -67,10 +67,17 @@ class Case(models.Model):
         label = CaseStatus.LABELS.get(status)
 
         if label:
+            from core.services.publish_outcome import PublishOutcome
+
             audit_log = self.audit_log
             audit_log.label = label
             audit_log.labeled_at = timezone.now()
             audit_log.save(update_fields=["label", "labeled_at"])
+
+            # A closed case is the best ground truth FLIT gets. Publishing it
+            # is what turns one merchant's review into the next merchant's
+            # defence.
+            PublishOutcome.call(audit_log=audit_log, application=self.application)
 
         return self
 

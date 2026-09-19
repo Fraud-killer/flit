@@ -1,7 +1,7 @@
 from devkit.message import Message
 from core.audit.events import TransactionEvent
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 from .mule_thresholds import get_mule_thresholds
 
 
@@ -12,6 +12,11 @@ class DormantAwakeningRule(BaseRule):
     Bought, farmed and taken-over accounts share this shape: months of
     silence, then activity that does not resemble the account's own past.
     """
+
+    techniques = ("F1042",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_mule_detection.py::TestDormantAwakeningRule"
 
     @property
     def applies(self):

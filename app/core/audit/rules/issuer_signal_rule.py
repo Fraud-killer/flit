@@ -8,6 +8,7 @@ fraud risk, velocity limits, or other business rules being triggered.
 from typing import Any
 from datetime import datetime
 from .payment_rule import PaymentRule
+from .base_rule import Maturity, RuleKind
 
 
 class IssuerSignalRule(PaymentRule):
@@ -20,6 +21,12 @@ class IssuerSignalRule(PaymentRule):
     - Velocity limit breaches
     - Card restrictions
     """
+
+    techniques = ("F1012", "F1028")
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_fraud_rules.py::TestIssuerSignalRule"
+
     
     trigger_fields = ("gateway_message", "provider_responses")
 

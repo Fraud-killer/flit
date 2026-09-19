@@ -9,6 +9,7 @@ from core.scoring import RiskEngine, RiskLevel
 from core.audit.recorder import AuditRecorder
 from core.audit.rules.visit_signals import fetch_event_visit
 from core.services.resolve_device_identity import ResolveDeviceIdentity
+from core.services.resolve_identity_ladder import resolve_identity_ladder
 from core.realtime.alerts import AlertManager, Alert, AlertLevel, AlertCategory
 
 
@@ -43,6 +44,14 @@ class Auditor:
         # IP & Bot Intelligence Rules
         rules.IPReputationRule,
         rules.BotSignalRule,
+        # Signup Surface Rules
+        rules.ExpectedSignalRule,
+        rules.DisposableEmailRule,
+        rules.EmailPatternRule,
+        rules.DomainReputationRule,
+        # Shared Protection Network
+        rules.NetworkReputationRule,
+        rules.ChallengeEvasionRule,
         # Device Graph Rules
         rules.MultiAccountingRule,
         rules.AccountSharingRule,
@@ -69,10 +78,19 @@ class Auditor:
     ):
         active_rules = list()
         scope = Scope()
+        visit = await fetch_event_visit(event, scope, cls.__name__)
         # A caller that already knows the device (a replay of historical
         # data, say) passes it in; otherwise it comes from the visit.
         scope.device_identity = device_identity or await cls._resolve_device_identity(
-            event, policy, scope,
+            event, policy, scope, visit=visit,
+        )
+        # Resolved after the device so the device becomes the ladder's top
+        # rung when there is one, and before the rules so a rule counting
+        # accounts on a key counts this event too.
+        scope.identity_ladder = await resolve_identity_ladder(
+            event=event, policy=policy, scope=scope,
+            visit=visit, device_identity=scope.device_identity,
+            write=record,
         )
         scope.account_activity = await cls._load_account_activity(event, policy)
 
@@ -133,6 +151,7 @@ class Auditor:
             account_age_days=getattr(event, "account_age_days", None) or None,
             historical_risk_scores=historical_scores,
             device_trust_score=device_trust_score,
+            coverage=scope.identity_ladder.coverage if scope.identity_ladder else None,
         )
 
         if send_alerts and risk_result.level in [RiskLevel.HIGH, RiskLevel.CRITICAL]:
@@ -151,20 +170,24 @@ class Auditor:
         return Struct(
             audit_id=str(audit_log.id) if audit_log else None,
             device_id=str(scope.device_identity.id) if scope.device_identity else None,
+            identity=scope.identity_ladder.describe() if scope.identity_ladder else None,
             risk_score=risk_result.total_score,
             risk_level=risk_result.level.value,
             rules=rule_names,
             reasons=reasons,
             should_block=risk_result.should_block,
             should_review=risk_result.should_review,
+            should_challenge=risk_result.should_challenge,
             recommendation=risk_result.recommendation,
             confidence=risk_result.confidence,
+            coverage=risk_result.coverage,
             factors=[f.code for f in risk_result.factors],
         )
 
     @classmethod
-    async def _resolve_device_identity(cls, event, policy, scope):
-        visit = await fetch_event_visit(event, scope, cls.__name__)
+    async def _resolve_device_identity(cls, event, policy, scope, visit=None):
+        if visit is None:
+            visit = await fetch_event_visit(event, scope, cls.__name__)
         if visit is None:
             return None
 

@@ -19,6 +19,7 @@ from collections import defaultdict
 from django.core.cache import cache
 
 from core.audit.rules.payment_rule import PaymentRule
+from .base_rule import Maturity, RuleKind
 
 
 @dataclass
@@ -42,6 +43,11 @@ class PaymentFraudRule(PaymentRule):
     4. Gateway decline reasons
     5. Billing/shipping address anomalies
     """
+
+    techniques = ("F1028",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_fraud_rules.py::TestPaymentFraudRule"
 
     AUTOMATED_CLIENTS = [
         r"^Faraday",

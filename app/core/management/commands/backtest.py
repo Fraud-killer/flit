@@ -15,6 +15,7 @@ from core.backtest.loader import iter_rows, LoaderError
 from core.backtest.mapping import EventMapping, MappingError
 from core.backtest.replay import Replay, DEFAULT_LABEL_DELAY_DAYS
 from core.backtest.report import build_report, format_report
+from core.taxonomy import evidence
 
 
 class Command(BaseCommand):
@@ -29,6 +30,8 @@ class Command(BaseCommand):
         parser.add_argument("--label-delay-days", type=int, default=DEFAULT_LABEL_DELAY_DAYS,
                             help="How long after a transaction its outcome is reported (default 7)")
         parser.add_argument("--out", help="Write the full report as JSON to this path")
+        parser.add_argument("--record-evidence", action="store_true",
+                            help="Write the measured per-rule results into the evidence ledger")
 
     def handle(self, *args, **options):
         try:
@@ -67,6 +70,24 @@ class Command(BaseCommand):
             with open(options["out"], "w") as handle:
                 json.dump(report, handle, indent=2, default=str)
             self.stdout.write(f"\nFull report: {options['out']}")
+
+        if options.get("record_evidence"):
+            # Only a run with labelled outcomes measures anything. Without
+            # labels the report still shows firing rates, but writing those
+            # to the ledger would dress up activity as evidence.
+            if not report.get("labels", {}).get("fraud"):
+                self.stdout.write(self.style.WARNING(
+                    "\nNo fraud labels in this run: nothing recorded as evidence."
+                ))
+            else:
+                written = evidence.record(
+                    entries=evidence.from_backtest(report),
+                    application=application.name,
+                    window=report.get("window"),
+                )
+                self.stdout.write(
+                    self.style.SUCCESS(f"\nRecorded evidence for {written} rule codes")
+                )
 
         if replay.skipped:
             self.stdout.write(self.style.WARNING(

@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from django.core.cache import cache
 
 from core.audit.rules.payment_rule import PaymentRule
+from .base_rule import Maturity, RuleKind
 
 
 @dataclass
@@ -36,6 +37,10 @@ class CardTestingRule(PaymentRule):
     - Same BIN with different card numbers
     - Rapid sequential attempts
     """
+
+    techniques = ("F1012",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.PROPOSED
 
     # TransactionEvent.amount is in major currency units (see core.money.Money)
     SMALL_AMOUNT_THRESHOLD = 5

@@ -75,3 +75,15 @@ temp_auto_push.bat
 temp_interactive_push.bat
 .gitignore
 branch_structure.json
+
+# Merchant data: settlement reports, exports, extracts. Never commit these.
+Skypay records/
+*.xlsx
+*.xls
+*.csv
+
+# The vendored MITRE F3 catalogue is source, not generated output: without it
+# core.taxonomy cannot load. COVERAGE.md is committed too, so CI can check the
+# published matrix still matches the registered rules. coverage.json stays
+# ignored — it is regenerated from the same command.
+!app/core/taxonomy/f3_catalogue.json

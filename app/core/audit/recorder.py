@@ -89,10 +89,21 @@ class AuditRecorder:
                 currency_code=cls.value(event, "currency_code"),
                 transaction_type=cls.value(event, "type"),
                 counterparty_id=cls.value(event, "counterparty_id"),
+                card_fingerprint=cls.value(event, "card_fingerprint"),
                 risk_level=risk_result.level.value,
                 recommendation=risk_result.recommendation,
                 should_block=risk_result.should_block,
+                should_challenge=risk_result.should_challenge,
+                coverage=risk_result.coverage,
                 rules=rule_names,
+                # The global identity keys this decision touched. Kept so that
+                # labelling it later — a case confirmed, a chargeback
+                # reported — can attribute that outcome back to them without
+                # re-resolving an event whose signals have since moved on.
+                identity_key_ids=(
+                    scope.identity_ladder.network_key_ids()
+                    if scope.identity_ladder else []
+                ),
                 # Kept so a simulation can re-score this decision under
                 # different weights without re-running the rules.
                 factors=[
@@ -104,7 +115,12 @@ class AuditRecorder:
 
     @staticmethod
     def value(event, name):
+        """Declared attributes first, then the payment fields in `extra`."""
         value = getattr(event, name, None)
+
+        if not is_present(value):
+            value = (getattr(event, "extra", None) or {}).get(name)
+
         return value if is_present(value) else None
 
     @classmethod

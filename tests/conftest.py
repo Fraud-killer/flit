@@ -16,6 +16,12 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("MCRYPT_KEY", Fernet.generate_key().decode())
 os.environ.setdefault("DEBUG", "true")
 
+# Keep the suite off the network. DomainIntelligence makes DNS-over-HTTPS and
+# RDAP calls in production; a test that reached for them would be slow, flaky
+# and dependent on someone else's uptime. The tests that exercise that rule
+# re-enable it against a stub by patching DomainIntelligence.enabled.
+os.environ.setdefault("DOMAIN_LOOKUPS_ENABLED", "false")
+
 
 def pytest_configure():
     django.setup()

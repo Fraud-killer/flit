@@ -44,6 +44,32 @@ Think: **"Cloudflare, but for fraud."** — **"Seatbelts, not ambulances."**
 
 ---
 
+## What FLIT Detects, and How Well
+
+FLIT maps its detectors onto the **[MITRE Fight Fraud Framework (F3)](https://github.com/center-for-threat-informed-defense/fight-fraud-framework)** — the fraud taxonomy MITRE's Center for Threat-Informed Defense published in April 2026 with JPMorganChase, Citigroup, Lloyds Banking Group, Standard Chartered and FS-ISAC.
+
+We do not define our own vocabulary. A risk team can ask "which F3 techniques do you cover?" and get an answer in the language they already use.
+
+**[COVERAGE.md](COVERAGE.md)** is that answer. It is generated from the registered rules — never written by hand — and CI fails if it drifts:
+
+```bash
+python manage.py coverage_matrix --out ../COVERAGE.md --json ../coverage.json
+```
+
+It reports three buckets, not two, because counting techniques FLIT has no telemetry for as "gaps" would be dishonest arithmetic:
+
+| | Meaning |
+|---|---|
+| **Covered** | At least one detector claims the technique |
+| **Addressable** | FLIT receives signals that could detect it, and does not yet — the roadmap |
+| **Outside telemetry** | Happens where a server-side decision layer has no eyes, with the reason stated |
+
+Every detector also declares where it sits on an **evidence ladder** — proposed, synthetic-tested, backtested, shadow-validated, production-observed, outcome-calibrated — and the test suite rejects any claim above `proposed` that cannot name the evidence behind it. From `backtested` upward the claim is numerical, so it must point at an entry in the evidence ledger written by the backtest harness, not at an assertion.
+
+`Proposed` is not a criticism. It means a detector is reasoned from how the fraud works and has not yet been measured against labelled history. Publishing that honestly is the point: a fraud tool whose effectiveness numbers cannot be traced to a dataset is asking to be taken on faith.
+
+---
+
 ## Features
 
 ### Core Security Capabilities

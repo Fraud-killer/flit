@@ -1,0 +1,803 @@
+{
+  "framework": "MITRE Fight Fraud Framework (F3)",
+  "licence": "Apache-2.0",
+  "retrieved": "2026-09-19",
+  "source": "https://github.com/center-for-threat-informed-defense/fight-fraud-framework",
+  "tactics": {
+    "FA0001": "Positioning",
+    "FA0002": "Monetization",
+    "TA0001": "Initial Access",
+    "TA0002": "Execution",
+    "TA0005": "Stealth",
+    "TA0042": "Resource Development",
+    "TA0043": "Reconnaissance",
+    "TA0112": "Defense Impairment"
+  },
+  "techniques": {
+    "F1001": {
+      "name": "3DS Bypass",
+      "tactics": [
+        "TA0005"
+      ]
+    },
+    "F1002": {
+      "name": "Abuse of Public-Facing API",
+      "tactics": [
+        "FA0001",
+        "TA0001",
+        "TA0002"
+      ]
+    },
+    "F1002.001": {
+      "name": "Abuse of Public-Facing API: Mobile API Abuse",
+      "tactics": [
+        "FA0001",
+        "TA0001",
+        "TA0002"
+      ]
+    },
+    "F1002.002": {
+      "name": "Abuse of Public-Facing API: Web API Abuse",
+      "tactics": [
+        "FA0001",
+        "TA0001",
+        "TA0002"
+      ]
+    },
+    "F1003": {
+      "name": "Abuse SMS verification",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1004": {
+      "name": "Access with Stolen Session Cookie",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "F1005": {
+      "name": "Account Manipulation",
+      "tactics": [
+        "FA0001",
+        "TA0112"
+      ]
+    },
+    "F1005.001": {
+      "name": "Account Manipulation: Account Linking",
+      "tactics": [
+        "FA0001",
+        "TA0112"
+      ]
+    },
+    "F1005.002": {
+      "name": "Account Manipulation: Add Authorized User",
+      "tactics": [
+        "FA0001",
+        "TA0112"
+      ]
+    },
+    "F1005.003": {
+      "name": "Account Manipulation: Add Beneficiary",
+      "tactics": [
+        "FA0001",
+        "TA0112"
+      ]
+    },
+    "F1005.004": {
+      "name": "Account Manipulation: Change Account Details",
+      "tactics": [
+        "FA0001",
+        "TA0112"
+      ]
+    },
+    "F1005.005": {
+      "name": "Account Manipulation: Change E-Delivery or Notification Settings",
+      "tactics": [
+        "FA0001",
+        "TA0112"
+      ]
+    },
+    "F1005.006": {
+      "name": "Account Manipulation: Change of Payment Details",
+      "tactics": [
+        "FA0001",
+        "TA0112"
+      ]
+    },
+    "F1005.007": {
+      "name": "Account Manipulation: Enable Account Features",
+      "tactics": [
+        "FA0001",
+        "TA0112"
+      ]
+    },
+    "F1005.008": {
+      "name": "Account Manipulation: Update Call Receiving Device",
+      "tactics": [
+        "FA0001",
+        "TA0112"
+      ]
+    },
+    "F1006": {
+      "name": "Account Takeover",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "F1006.001": {
+      "name": "Account Takeover: Exposed API Key",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "F1006.002": {
+      "name": "Account Takeover: Exposed Login Credential",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "F1006.003": {
+      "name": "Account Takeover: Password Reset",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "F1007": {
+      "name": "Adversary-in-the-Browser",
+      "tactics": [
+        "FA0001",
+        "TA0001",
+        "TA0002"
+      ]
+    },
+    "F1007.001": {
+      "name": "Adversary-in-the-Browser: DLL Injection",
+      "tactics": [
+        "FA0001",
+        "TA0001",
+        "TA0002"
+      ]
+    },
+    "F1007.002": {
+      "name": "Adversary-in-the-Browser: Malicious Browser Extension",
+      "tactics": [
+        "FA0001",
+        "TA0001",
+        "TA0002"
+      ]
+    },
+    "F1007.003": {
+      "name": "Adversary-in-the-Browser: Malicious JavaScript Injection",
+      "tactics": [
+        "FA0001",
+        "TA0001",
+        "TA0002"
+      ]
+    },
+    "F1008": {
+      "name": "ATM Manipulation",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1008.001": {
+      "name": "ATM Manipulation: ATM Hardware Manipulation",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1008.002": {
+      "name": "ATM Manipulation: ATM Software Manipulation",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1009": {
+      "name": "Bank Deposit",
+      "tactics": [
+        "FA0001",
+        "TA0002"
+      ]
+    },
+    "F1009.001": {
+      "name": "Bank Deposit: ATM Deposit",
+      "tactics": [
+        "FA0001",
+        "TA0002"
+      ]
+    },
+    "F1009.002": {
+      "name": "Bank Deposit: Mobile Deposit",
+      "tactics": [
+        "FA0001",
+        "TA0002"
+      ]
+    },
+    "F1009.003": {
+      "name": "Bank Deposit: Night Deposit",
+      "tactics": [
+        "FA0001",
+        "TA0002"
+      ]
+    },
+    "F1009.004": {
+      "name": "Bank Deposit: Test Deposit",
+      "tactics": [
+        "FA0001",
+        "TA0002"
+      ]
+    },
+    "F1010": {
+      "name": "Buy Money Order",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1011": {
+      "name": "Card Dump Capture",
+      "tactics": [
+        "FA0001",
+        "TA0043"
+      ]
+    },
+    "F1012": {
+      "name": "Card Testing",
+      "tactics": [
+        "FA0001"
+      ]
+    },
+    "F1013": {
+      "name": "Change Payroll Details",
+      "tactics": [
+        "FA0001"
+      ]
+    },
+    "F1014": {
+      "name": "Check Fraud",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1015": {
+      "name": "Churning",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1016": {
+      "name": "Compromise Payment Gateway",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "F1017": {
+      "name": "Conversion to Physical Monetary Instruments",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1017.001": {
+      "name": "Conversion to Physical Monetary Instruments: Cash",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1017.002": {
+      "name": "Conversion to Physical Monetary Instruments: Cashier's Check",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1017.003": {
+      "name": "Conversion to Physical Monetary Instruments: Money Order",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1018": {
+      "name": "Convert to Cryptocurrency",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1019": {
+      "name": "Create Counterfeit Card",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "F1020": {
+      "name": "Create Fake Materials",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "F1020.001": {
+      "name": "Create Fake Materials: Fake Documents",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "F1020.002": {
+      "name": "Create Fake Materials: Fake Website",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "F1021": {
+      "name": "Create Fraudulent Merchant Account",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "F1022": {
+      "name": "Delete Relevant Emails",
+      "tactics": [
+        "TA0005"
+      ]
+    },
+    "F1023": {
+      "name": "Device Fingerprint Spoofing",
+      "tactics": [
+        "TA0005"
+      ]
+    },
+    "F1024": {
+      "name": "Dispute Legitimate Transaction",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1025": {
+      "name": "Electronic Funds Transfer",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1025.001": {
+      "name": "Electronic Funds Transfer: Peer-to-Peer Transfer",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1025.002": {
+      "name": "Electronic Funds Transfer: Regional Payment Rail",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1025.003": {
+      "name": "Electronic Funds Transfer: Wire Transfer",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1026": {
+      "name": "Exploitation of Gambling Platforms",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1027": {
+      "name": "Falsify Business Documents",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "F1028": {
+      "name": "Fradulent Purchasing",
+      "tactics": [
+        "FA0002",
+        "TA0002"
+      ]
+    },
+    "F1029": {
+      "name": "Gather Customer Information",
+      "tactics": [
+        "TA0043"
+      ]
+    },
+    "F1030": {
+      "name": "Geolocation Spoofing",
+      "tactics": [
+        "TA0005"
+      ]
+    },
+    "F1031": {
+      "name": "Impersonate Account Holder",
+      "tactics": [
+        "TA0001",
+        "TA0005"
+      ]
+    },
+    "F1032": {
+      "name": "Impersonate Official",
+      "tactics": [
+        "TA0001",
+        "TA0005"
+      ]
+    },
+    "F1033": {
+      "name": "Insider Access Abuse",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "F1034": {
+      "name": "Interactive Voice Response Mapping",
+      "tactics": [
+        "TA0043"
+      ]
+    },
+    "F1035": {
+      "name": "Mail Theft",
+      "tactics": [
+        "FA0001",
+        "TA0043"
+      ]
+    },
+    "F1036": {
+      "name": "New Vendor Setup",
+      "tactics": [
+        "FA0001",
+        "TA0005"
+      ]
+    },
+    "F1037": {
+      "name": "NFC Payment",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1038": {
+      "name": "PAN/CVV Generation",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "F1039": {
+      "name": "PaReq Manipulation",
+      "tactics": [
+        "TA0005"
+      ]
+    },
+    "F1040": {
+      "name": "Phone Number Spoofing",
+      "tactics": [
+        "TA0001",
+        "TA0005",
+        "TA0043"
+      ]
+    },
+    "F1040.001": {
+      "name": "Phone Number Spoofing: Customer Phone Number Spoofing",
+      "tactics": [
+        "TA0001",
+        "TA0005",
+        "TA0043"
+      ]
+    },
+    "F1040.002": {
+      "name": "Phone Number Spoofing: Official Phone Number Spoofing",
+      "tactics": [
+        "TA0001",
+        "TA0005",
+        "TA0043"
+      ]
+    },
+    "F1041": {
+      "name": "PIN-code Peeking",
+      "tactics": [
+        "TA0001",
+        "TA0043"
+      ]
+    },
+    "F1042": {
+      "name": "Reactivate Account",
+      "tactics": [
+        "FA0001",
+        "TA0001"
+      ]
+    },
+    "F1043": {
+      "name": "Reversal of Transaction",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1044": {
+      "name": "Scheduled Transfer",
+      "tactics": [
+        "TA0002"
+      ]
+    },
+    "F1045": {
+      "name": "Structuring",
+      "tactics": [
+        "TA0005"
+      ]
+    },
+    "F1046": {
+      "name": "Test Payment Thresholds",
+      "tactics": [
+        "FA0001"
+      ]
+    },
+    "F1047": {
+      "name": "Transfer of funds",
+      "tactics": [
+        "FA0002"
+      ]
+    },
+    "F1048": {
+      "name": "Use Virtual Cards",
+      "tactics": [
+        "TA0005"
+      ]
+    },
+    "T1070": {
+      "name": "Indicator Removal",
+      "tactics": [
+        "TA0005"
+      ]
+    },
+    "T1110": {
+      "name": "Brute Force",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1110.001": {
+      "name": "Brute Force: Password Guessing",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1110.002": {
+      "name": "Brute Force: Password Cracking",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1110.003": {
+      "name": "Brute Force: Password Spraying",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1110.004": {
+      "name": "Brute Force:  Credential Stuffing",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1111": {
+      "name": "Multi-Factor Authentication Interception",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1113": {
+      "name": "Screen Capture",
+      "tactics": [
+        "FA0001"
+      ]
+    },
+    "T1185": {
+      "name": "Browser Session Hijacking",
+      "tactics": [
+        "FA0001",
+        "TA0001"
+      ]
+    },
+    "T1189": {
+      "name": "Drive-by Compromise",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1195": {
+      "name": "Supply Chain Compromise",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1219": {
+      "name": "Remote Access Tools",
+      "tactics": [
+        "FA0001"
+      ]
+    },
+    "T1451": {
+      "name": "SIM Card Swap",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1453": {
+      "name": "Abuse Accessibility Features",
+      "tactics": [
+        "FA0001"
+      ]
+    },
+    "T1531": {
+      "name": "Account Access Removal",
+      "tactics": [
+        "FA0001"
+      ]
+    },
+    "T1539": {
+      "name": "Steal Web Session Cookie",
+      "tactics": [
+        "FA0001",
+        "TA0001"
+      ]
+    },
+    "T1550": {
+      "name": "Use Alternate Authentication Material",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1550.001": {
+      "name": "Use Alternate Authentication Material: Application Access Token",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1555": {
+      "name": "Credentials from Password Stores",
+      "tactics": [
+        "TA0043"
+      ]
+    },
+    "T1555.003": {
+      "name": "Credentials from Password Stores: Credentials from Web Browsers",
+      "tactics": [
+        "TA0043"
+      ]
+    },
+    "T1555.005": {
+      "name": "Credentials from Password Stores: Password Managers",
+      "tactics": [
+        "TA0043"
+      ]
+    },
+    "T1557": {
+      "name": "Adversary-in-the-Middle",
+      "tactics": [
+        "FA0001",
+        "TA0001",
+        "TA0002"
+      ]
+    },
+    "T1583": {
+      "name": "Acquire Infrastructure",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1583.001": {
+      "name": "Acquire Infrastructure: Domains",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1583.003": {
+      "name": "Acquire Infrastructure: Virtual Private Network or Server",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1583.008": {
+      "name": "Acquire Infrastructure: Malvertising",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1585": {
+      "name": "Establish Accounts",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1586": {
+      "name": "Compromise Accounts",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1586.001": {
+      "name": "Compromise Accounts: Social Media Accounts",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1586.002": {
+      "name": "Compromise Accounts: Email Accounts",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1586.003": {
+      "name": "Compromise Accounts: Cloud Accounts",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1586.004": {
+      "name": "Compromise Accounts: Corporate Accounts",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1593": {
+      "name": "Search Open Websites/Domains",
+      "tactics": [
+        "TA0043"
+      ]
+    },
+    "T1593.001": {
+      "name": "Search Open Websites/Domains: Social Media",
+      "tactics": [
+        "TA0043"
+      ]
+    },
+    "T1593.002": {
+      "name": "Search Open Websites/Domains: Search Engines",
+      "tactics": [
+        "TA0043"
+      ]
+    },
+    "T1598": {
+      "name": "Phishing for Information",
+      "tactics": [
+        "TA0043"
+      ]
+    },
+    "T1608": {
+      "name": "Stage Capabilities",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1608.006": {
+      "name": "Stage Capabilities: SEO Poisoning",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1621": {
+      "name": "Multi-Factor Authentication Request Generation",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1650": {
+      "name": "Acquire Access",
+      "tactics": [
+        "TA0042"
+      ]
+    },
+    "T1660": {
+      "name": "Phishing",
+      "tactics": [
+        "TA0001"
+      ]
+    },
+    "T1667": {
+      "name": "Email Bombing",
+      "tactics": [
+        "TA0112"
+      ]
+    },
+    "T1672": {
+      "name": "Email Spoofing",
+      "tactics": [
+        "TA0005"
+      ]
+    }
+  },
+  "version": "1.1"
+}

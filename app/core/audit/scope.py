@@ -12,6 +12,11 @@ class Scope(LockCache):
     # The DeviceIdentity resolved for the audited event, set by Auditor.
     device_identity = None
 
+    # Every correlation key resolved for the event, strongest first, set by
+    # Auditor. The device identity above is its strongest rung; the weaker
+    # rungs are what keeps correlation working when there is no device at all.
+    identity_ladder = None
+
     # The account's recent transactions, set by Auditor.
     account_activity = None
 

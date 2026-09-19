@@ -15,6 +15,7 @@ from collections import defaultdict
 from django.core.cache import cache
 
 from core.audit.rules.payment_rule import PaymentRule
+from .base_rule import Maturity, RuleKind
 
 
 @dataclass
@@ -40,6 +41,11 @@ class GatewayPatternRule(PaymentRule):
     - "Cancelled by Timeout" - Session timeout
     - "Acquirer Malfunction" - System issue
     """
+
+    techniques = ("F1016", "F1028")
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_fraud_rules.py::TestGatewayPatternRule"
 
     DECLINE_PATTERNS = {
         # High-risk fraud indicators

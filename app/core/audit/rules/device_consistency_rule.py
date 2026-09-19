@@ -1,7 +1,7 @@
 from devkit.message import Message
-from core.audit.events import ClientEvent, TransactionEvent
+from core.audit.events import SIGNAL_EVENTS
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 from .visit_signals import fetch_visit_signals, event_value
 
 
@@ -13,6 +13,11 @@ class DeviceConsistencyRule(BaseRule):
     consistent with the others is much harder, so these cross-checks catch
     what a plain fingerprint comparison misses.
     """
+
+    techniques = ("F1023",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_device_collection.py::TestConsistencyChecks"
 
     # consistency flag -> (message code, text)
     FLAGS = {
@@ -27,7 +32,7 @@ class DeviceConsistencyRule(BaseRule):
     @property
     def applies(self):
         return (
-            isinstance(self.event, (ClientEvent, TransactionEvent))
+            isinstance(self.event, SIGNAL_EVENTS)
             and event_value(self.event, "visit_token") is not None
         )
 

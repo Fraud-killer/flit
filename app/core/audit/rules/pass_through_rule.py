@@ -1,7 +1,7 @@
 from devkit.message import Message
 from core.audit.events import TransactionEvent
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 from .mule_thresholds import get_mule_thresholds
 
 
@@ -13,6 +13,11 @@ class PassThroughRule(BaseRule):
     almost immediately, and close to in full. Ordinary customers accumulate,
     spend part of a balance, and do not time withdrawals to arrivals.
     """
+
+    techniques = ("F1047", "F1025")
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_mule_detection.py::TestPassThroughRule"
 
     @property
     def applies(self):
