@@ -82,13 +82,36 @@ once enough of Figo's traffic carries one.
 
 ## What FLIT will not do for Figo
 
-FLIT does not read chains. It has no balances, no clustering, no sanctions
-screening, no provenance. Figo already has custody and chain analytics
-providers for that, and duplicating them badly would help nobody.
+FLIT does not read chains. No balances, no clustering, no provenance, no
+indirect exposure. Figo already has custody and chain analytics providers for
+that, and duplicating them badly would help nobody.
 
 FLIT's half is what happens before anything is signed: the device, the
 session, the signup, the takeover, and the shape of money moving between
 accounts.
+
+Two on-chain exceptions, both deliberately narrow because both are free and
+neither needs a graph:
+
+- **Has this wallet ever transacted?** One RPC call. A brand-new wallet
+  funding a brand-new account is a farm signature, the same way a
+  domain registered yesterday is.
+- **Is this address on the OFAC SDN list?** One string comparison against a
+  list Treasury publishes publicly. This is the exact-match half of an
+  obligation and nothing more — an address one hop from a sanctioned one is
+  invisible to it. That is what a screening vendor is for, and a fintech with
+  real obligations should still have one.
+
+Both need scheduling:
+
+```bash
+python manage.py refresh_sanctions   # daily; alert on failure
+python manage.py expire_challenges   # every few minutes
+```
+
+A sanctions list that quietly stopped refreshing is worse than no list, so
+FLIT reports an unloaded or stale list on the decision itself rather than
+letting the check pass silently.
 
 ## First backtest: what actually happened
 

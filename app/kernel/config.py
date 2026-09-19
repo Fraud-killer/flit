@@ -95,6 +95,18 @@ class Config(metaclass=ConfigMeta):
         raise VariableError(msg_to_bool.text)
 
     @variable
+    def sanctions_list_url(self, ctx):
+        """
+        Where the OFAC SDN list is fetched from. Defaults to the US Treasury
+        publication. The file is parsed as XML, so point this only at a
+        source you trust as much as Treasury itself.
+        """
+        return ctx.load.env(
+            "SANCTIONS_LIST_URL",
+            "https://www.treasury.gov/ofac/downloads/sdn.xml",
+        )
+
+    @variable
     def chain_lookups_enabled(self, ctx):
         """
         Whether WalletChainIntelligence may ask a public RPC node whether an

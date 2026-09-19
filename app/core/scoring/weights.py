@@ -77,6 +77,12 @@ class RiskWeights:
     # A first transaction is somebody's genuine first transaction, so this
     # is weighted to corroborate rather than to decide on its own.
     fresh_funding_wallet: float = 0.4
+    # A sanctions hit is not a risk signal to be weighed against others.
+    sanctioned_address: float = 1.0
+    # Screening did not happen, or happened against a stale list. Reported
+    # on the decision, never scored — the point is that it is visible.
+    sanctions_screening_unavailable: float = 0.0
+    sanctions_list_stale: float = 0.0
     # Corroboration from other merchants: the one kind of evidence that did
     # not come from the merchant being protected. Weighted so that the
     # k-anonymity floor of two contributors lands on a challenge and further
@@ -188,6 +194,9 @@ class RiskWeights:
             "new_withdrawal_address": self.new_withdrawal_address,
             "collection_wallet": self.collection_wallet,
             "fresh_funding_wallet": self.fresh_funding_wallet,
+            "sanctioned_address": self.sanctioned_address,
+            "sanctions_screening_unavailable": self.sanctions_screening_unavailable,
+            "sanctions_list_stale": self.sanctions_list_stale,
             "network_fraud_history": self.network_fraud_history,
             "challenge_evasion": self.challenge_evasion,
             "req_event_attrs": self.req_event_attrs,

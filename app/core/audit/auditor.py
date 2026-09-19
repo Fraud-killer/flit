@@ -54,6 +54,7 @@ class Auditor:
         rules.NewWithdrawalAddressRule,
         rules.CollectionWalletRule,
         rules.FreshFundingWalletRule,
+        rules.SanctionedAddressRule,
         # Shared Protection Network
         rules.NetworkReputationRule,
         rules.ChallengeEvasionRule,
