@@ -17,6 +17,7 @@ jobs:
       # Keep the suite off the network: DomainIntelligence would otherwise
       # make DNS-over-HTTPS and RDAP calls.
       DOMAIN_LOOKUPS_ENABLED: "false"
+      CHAIN_LOOKUPS_ENABLED: "false"
 
     steps:
       - uses: actions/checkout@v4

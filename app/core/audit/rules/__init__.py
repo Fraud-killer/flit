@@ -31,6 +31,7 @@ from .domain_reputation_rule import DomainReputationRule as DomainReputationRule
 from .crypto_cash_out_rule import CryptoCashOutRule as CryptoCashOutRule
 from .new_withdrawal_address_rule import NewWithdrawalAddressRule as NewWithdrawalAddressRule
 from .collection_wallet_rule import CollectionWalletRule as CollectionWalletRule
+from .fresh_funding_wallet_rule import FreshFundingWalletRule as FreshFundingWalletRule
 
 from .network_reputation_rule import NetworkReputationRule as NetworkReputationRule
 from .challenge_evasion_rule import ChallengeEvasionRule as ChallengeEvasionRule

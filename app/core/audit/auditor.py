@@ -53,6 +53,7 @@ class Auditor:
         rules.CryptoCashOutRule,
         rules.NewWithdrawalAddressRule,
         rules.CollectionWalletRule,
+        rules.FreshFundingWalletRule,
         # Shared Protection Network
         rules.NetworkReputationRule,
         rules.ChallengeEvasionRule,

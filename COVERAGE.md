@@ -23,7 +23,7 @@ Of the 19 covered techniques, **1** rest on a detector with measured precision a
 | Rung | Detectors | What it requires |
 |---|---|---|
 | Proposed | 13 | Reasoned from how the fraud works. No evidence yet. |
-| Synthetic-tested | 25 | Fires on a constructed example of the technique and stays quiet on a constructed legitimate lookalike. |
+| Synthetic-tested | 26 | Fires on a constructed example of the technique and stays quiet on a constructed legitimate lookalike. |
 | Historically backtested | 1 | Run against a merchant's labelled history, with measured precision and recall at the shipped threshold. |
 | Shadow-validated | 0 | Run against live traffic without acting on it, and reviewed. |
 | Production-observed | 0 | Acting in production, with its decisions labelled by reviewers. |
@@ -52,8 +52,8 @@ Of the 19 covered techniques, **1** rest on a detector with measured precision a
 | `F1045` | Structuring | Stealth | Historically backtested | StructuringRule |
 | `F1047` | Transfer of funds | Monetization | Synthetic-tested | CollectionWalletRule, MuleNetworkRule, PassThroughRule |
 | `T1110` | Brute Force | Initial Access | Proposed | VelocityCheckRule |
-| `T1583` | Acquire Infrastructure | Resource Development | Synthetic-tested | DomainReputationRule, IPConcentrationRule, IPReputationRule |
-| `T1585` | Establish Accounts | Resource Development | Synthetic-tested | AccountFarmingRule, AccountSharingRule, DisposableEmailRule, DomainReputationRule, EmailPatternRule, MultiAccountingRule |
+| `T1583` | Acquire Infrastructure | Resource Development | Synthetic-tested | DomainReputationRule, FreshFundingWalletRule, IPConcentrationRule, IPReputationRule |
+| `T1585` | Establish Accounts | Resource Development | Synthetic-tested | AccountFarmingRule, AccountSharingRule, DisposableEmailRule, DomainReputationRule, EmailPatternRule, FreshFundingWalletRule, MultiAccountingRule |
 
 ## Addressable, not yet covered
 
@@ -146,6 +146,7 @@ These happen where a server-side decision layer has no eyes. They are listed so 
 | EmailPatternRule | detection | `T1585` | Synthetic-tested | tests/unit/test_signup_defence.py::TestEmailIntelligence |
 | ExpectedSignalRule | detection | `F1002`, `F1023` | Synthetic-tested | tests/unit/test_signup_defence.py::TestAbsenceAsEvidence |
 | FakeAddressRule | detection | `F1020` | Synthetic-tested | tests/unit/test_fraud_rules.py::TestFakeAddressRule |
+| FreshFundingWalletRule | detection | `T1583`, `T1585` | Synthetic-tested | tests/unit/test_wallet_history.py::TestFreshFundingWalletRule |
 | GatewayPatternRule | detection | `F1016`, `F1028` | Synthetic-tested | tests/unit/test_fraud_rules.py::TestGatewayPatternRule |
 | IPConcentrationRule | detection | `T1583` | Synthetic-tested | tests/unit/test_fraud_rules.py::TestIPConcentrationRule |
 | IPReputationRule | detection | `T1583`, `F1030` | Synthetic-tested | tests/unit/test_intelligence.py::TestIPReputationRule |

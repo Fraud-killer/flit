@@ -74,6 +74,9 @@ class RiskWeights:
     # alongside something else, which is when it means a takeover.
     new_withdrawal_address: float = 0.45
     collection_wallet: float = 0.8
+    # A first transaction is somebody's genuine first transaction, so this
+    # is weighted to corroborate rather than to decide on its own.
+    fresh_funding_wallet: float = 0.4
     # Corroboration from other merchants: the one kind of evidence that did
     # not come from the merchant being protected. Weighted so that the
     # k-anonymity floor of two contributors lands on a challenge and further
@@ -184,6 +187,7 @@ class RiskWeights:
             "crypto_cash_out": self.crypto_cash_out,
             "new_withdrawal_address": self.new_withdrawal_address,
             "collection_wallet": self.collection_wallet,
+            "fresh_funding_wallet": self.fresh_funding_wallet,
             "network_fraud_history": self.network_fraud_history,
             "challenge_evasion": self.challenge_evasion,
             "req_event_attrs": self.req_event_attrs,

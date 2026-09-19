@@ -21,6 +21,7 @@ os.environ.setdefault("DEBUG", "true")
 # and dependent on someone else's uptime. The tests that exercise that rule
 # re-enable it against a stub by patching DomainIntelligence.enabled.
 os.environ.setdefault("DOMAIN_LOOKUPS_ENABLED", "false")
+os.environ.setdefault("CHAIN_LOOKUPS_ENABLED", "false")
 
 
 def pytest_configure():

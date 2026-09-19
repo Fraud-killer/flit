@@ -3,10 +3,15 @@
 -- One row per transaction, with the two fields FLIT cannot get from the
 -- transactions table alone:
 --
---   wallet_address        the address the user funds from, which becomes
---                         their identity-ladder rung
---   counterparty_address  where a crypto withdrawal went, which is what
---                         CollectionWalletRule counts accounts against
+--   counterparty_address  the external address on the other side, which is
+--                         what CollectionWalletRule counts accounts against
+--                         and what FreshFundingWalletRule asks about
+--
+-- Figo's own wallet_addresses rows are deliberately not exported. They are
+-- deposit addresses Figo generates per user, so each correlates only the
+-- account it already belongs to, and its age says when Figo created it. The
+-- address worth having is the external one on the other side of the transfer,
+-- which for deposits currently sits in provider_data rather than a column.
 --
 -- A crypto destination lives on the recipient row as `account_number` when
 -- the channel is CRYPTO — the same column holds a bank account number for
@@ -25,19 +30,6 @@ SELECT
     t.hash,
     t.wallet_balance_after,
     t.created_at,
-
-    -- The user's own deposit address for this chain, when they have one.
-    (
-        SELECT w.address
-        FROM wallet_addresses w
-        WHERE w.user_id = t.user_id
-          -- Cast both sides: wallet_addresses.chain and transactions.chain are
-          -- two different Postgres enum types with the same values, and
-          -- comparing them directly yields nothing rather than erroring.
-          AND w.chain::text = t.chain::text
-        ORDER BY w.created_at
-        LIMIT 1
-    )                           AS wallet_address,
 
     CASE
         WHEN r.channel::text = 'CRYPTO' THEN r.account_number
