@@ -31,7 +31,10 @@ SELECT
         SELECT w.address
         FROM wallet_addresses w
         WHERE w.user_id = t.user_id
-          AND w.chain = t.chain
+          -- Cast both sides: wallet_addresses.chain and transactions.chain are
+          -- two different Postgres enum types with the same values, and
+          -- comparing them directly yields nothing rather than erroring.
+          AND w.chain::text = t.chain::text
         ORDER BY w.created_at
         LIMIT 1
     )                           AS wallet_address,

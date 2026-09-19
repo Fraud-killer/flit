@@ -246,3 +246,34 @@ class TestCollectionWallet:
         assert "account_farming:counterparty" not in codes(result)
         assert "multi_accounting:counterparty" not in codes(result)
         assert "counterparty" not in (result.identity["rungs"] or [])
+
+
+class TestCashOutNeedsSomewhereToGo:
+    """
+    Regression from a real backtest. A platform that settles internally in
+    stablecoin stamps a chain on nearly every row, so gating the cash-out
+    rule on the chain alone made it fire on wallet-to-card movements that
+    never left the platform.
+    """
+
+    def test_an_internal_movement_is_not_a_cash_out(
+        self, application, no_geoip,
+    ):
+        transfer(application, type="credit", amount=1000, client_id="internal_1")
+        result = transfer(
+            application, type="debit", amount=950, client_id="internal_1",
+            counterparty_address=None,
+        )
+
+        assert "crypto_cash_out" not in codes(result)
+
+    def test_the_same_movement_to_an_external_address_is(
+        self, application, no_geoip,
+    ):
+        transfer(application, type="credit", amount=1000, client_id="external_1")
+        result = transfer(
+            application, type="debit", amount=950, client_id="external_1",
+            counterparty_address=COLLECTOR,
+        )
+
+        assert "crypto_cash_out" in codes(result)

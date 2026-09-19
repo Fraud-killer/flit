@@ -1,0 +1,130 @@
+{
+  "codes": {
+    "credit_structuring": {
+      "application": "Figo",
+      "fired": 56,
+      "lift": 13.1,
+      "measured_at": null,
+      "on_fraud": 12,
+      "on_legit": 44,
+      "only_on_fraud": false,
+      "precision": 0.2143,
+      "window": {
+        "end": "2026-09-19T21:57:10.868878+00:00",
+        "start": "2026-02-01T12:47:28.150450+00:00"
+      }
+    },
+    "crypto_cash_out": {
+      "application": "Figo",
+      "fired": 38,
+      "lift": null,
+      "measured_at": null,
+      "on_fraud": 0,
+      "on_legit": 21,
+      "only_on_fraud": false,
+      "precision": 0.0,
+      "window": {
+        "end": "2026-09-19T21:57:10.868878+00:00",
+        "start": "2026-02-01T12:47:28.150450+00:00"
+      }
+    },
+    "dormant_account_activity": {
+      "application": "Figo",
+      "fired": 36,
+      "lift": null,
+      "measured_at": null,
+      "on_fraud": 0,
+      "on_legit": 36,
+      "only_on_fraud": false,
+      "precision": 0.0,
+      "window": {
+        "end": "2026-09-19T21:57:10.868878+00:00",
+        "start": "2026-02-01T12:47:28.150450+00:00"
+      }
+    },
+    "high_failure_rate": {
+      "application": "Figo",
+      "fired": 154,
+      "lift": null,
+      "measured_at": null,
+      "on_fraud": 0,
+      "on_legit": 154,
+      "only_on_fraud": false,
+      "precision": 0.0,
+      "window": {
+        "end": "2026-09-19T21:57:10.868878+00:00",
+        "start": "2026-02-01T12:47:28.150450+00:00"
+      }
+    },
+    "new_withdrawal_address": {
+      "application": "Figo",
+      "fired": 22,
+      "lift": null,
+      "measured_at": null,
+      "on_fraud": 0,
+      "on_legit": 21,
+      "only_on_fraud": false,
+      "precision": 0.0,
+      "window": {
+        "end": "2026-09-19T21:57:10.868878+00:00",
+        "start": "2026-02-01T12:47:28.150450+00:00"
+      }
+    },
+    "pass_through_funds": {
+      "application": "Figo",
+      "fired": 769,
+      "lift": 0.65,
+      "measured_at": null,
+      "on_fraud": 10,
+      "on_legit": 751,
+      "only_on_fraud": false,
+      "precision": 0.0131,
+      "window": {
+        "end": "2026-09-19T21:57:10.868878+00:00",
+        "start": "2026-02-01T12:47:28.150450+00:00"
+      }
+    },
+    "policy_currency_mismatch": {
+      "application": "Figo",
+      "fired": 11868,
+      "lift": 1.0,
+      "measured_at": null,
+      "on_fraud": 235,
+      "on_legit": 11408,
+      "only_on_fraud": false,
+      "precision": 0.0202,
+      "window": {
+        "end": "2026-09-19T21:57:10.868878+00:00",
+        "start": "2026-02-01T12:47:28.150450+00:00"
+      }
+    },
+    "velocity_exceeded_per_hour": {
+      "application": "Figo",
+      "fired": 4,
+      "lift": null,
+      "measured_at": null,
+      "on_fraud": 0,
+      "on_legit": 4,
+      "only_on_fraud": false,
+      "precision": 0.0,
+      "window": {
+        "end": "2026-09-19T21:57:10.868878+00:00",
+        "start": "2026-02-01T12:47:28.150450+00:00"
+      }
+    },
+    "velocity_exceeded_per_minute": {
+      "application": "Figo",
+      "fired": 43,
+      "lift": null,
+      "measured_at": null,
+      "on_fraud": 0,
+      "on_legit": 33,
+      "only_on_fraud": false,
+      "precision": 0.0,
+      "window": {
+        "end": "2026-09-19T21:57:10.868878+00:00",
+        "start": "2026-02-01T12:47:28.150450+00:00"
+      }
+    }
+  }
+}

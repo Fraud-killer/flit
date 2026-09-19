@@ -90,6 +90,83 @@ FLIT's half is what happens before anything is signed: the device, the
 session, the signup, the takeover, and the shape of money moving between
 accounts.
 
+## First backtest: what actually happened
+
+Run 2026-09-19 over **11,868 transactions** (2026-02-01 to 2026-09-19), all
+replayed, none skipped.
+
+**Labels are the weak part, and they decide how much any of this means.**
+Figo has no chargeback data — `card_disputes` is empty — so the only ground
+truth available is which users were blocked. That gives 235 fraud
+transactions from 24 blocked users against 11,408 from 457 verified,
+never-blocked users. Both sides are approximations: a user blocked in May has
+their February transactions labelled fraud, and undetected fraud is labelled
+legit.
+
+### The headline
+
+At the shipped threshold of 0.7, FLIT blocked **nothing** and caught **none**
+of the 235. The best point anywhere on the curve is `block_at` 0.3–0.4, which
+catches 20 of 235 — **8.5% recall at an 8.8% false-positive rate**, precision
+0.02. That is not a deployable setting; it is a measurement that the
+transaction rules, as they stand, do not separate fraud from good customers
+on this portfolio.
+
+### Rule by rule
+
+| Rule code | Fired | On fraud | On legit | Lift |
+|---|---|---|---|---|
+| `credit_structuring` | 56 | 12 | 44 | **13.1** |
+| `pass_through_funds` | 769 | 10 | 751 | 0.65 |
+| `crypto_cash_out` | 38 | 0 | 21 | — |
+| `high_failure_rate` | 154 | 0 | 154 | — |
+| `new_withdrawal_address` | 22 | 0 | 21 | — |
+| `dormant_account_activity` | 36 | 0 | 36 | — |
+
+Only **`credit_structuring`** carries signal: 13× more likely on a blocked
+user than a good one, precision 0.21. It is the one detector in FLIT now
+sitting at `backtested` on the evidence ladder, and this run is why.
+
+`pass_through_funds` has lift **below 1** — it fires slightly *more* on good
+customers than on fraud here. That is worth knowing and worth not shipping a
+claim about.
+
+### Two defects the run exposed
+
+- **`crypto_cash_out` gated on the chain alone**, and Figo settles internally
+  in stablecoin, so 11,859 of 11,868 rows carry a chain. The rule fired 1,352
+  times on wallet-to-card movements that never left the platform. It now
+  requires an external destination address; firings dropped to **38**.
+- **The policy currency defaulted to NGN** while Figo is 100% USD, so
+  `policy_currency_mismatch` fired on every row and the AML limit could not be
+  evaluated at all. Set `aml_cft_limit` in the currency the portfolio actually
+  uses before reading anything into a run.
+
+### Why this is measuring the wrong half
+
+A transactions export does not exercise the part of FLIT that works best on
+Figo. The September 2026 signup flood was caught 11 out of 11 by the
+registration rules — and none of those rules appear in this backtest, because
+a transaction export contains no signups. Figo's documented fraud history is
+largely signup-stage: temp-email farming, ring registrations, accounts
+blocked before they ever transacted. Of the 69 blocked users, only 24 ever
+made a transaction.
+
+So the honest reading is not "FLIT does not work on Figo". It is: **the
+transaction rules do not separate this portfolio, the labels are too weak to
+conclude much, and the half of FLIT that does work here has not been measured
+yet.**
+
+### What would make the next run mean more
+
+1. **Per-transaction labels.** Blocked-user proxy labels put a whole history
+   on the wrong side of the line. Even a few dozen confirmed fraudulent
+   transactions would be worth more than 235 inferred ones.
+2. **Replay registrations, not just transactions.** That is where FLIT is
+   strong and where Figo's fraud actually lives.
+3. **Report outcomes going forward** through `POST /outcomes`, so labels
+   accumulate as ground truth instead of being reconstructed afterwards.
+
 ## Observations from Figo's production data
 
 Checked on 2026-09-19, and worth knowing before the first backtest:

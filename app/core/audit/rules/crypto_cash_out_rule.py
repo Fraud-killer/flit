@@ -18,6 +18,13 @@ class CryptoCashOutRule(BaseRule):
     PassThroughRule sees the same shape without knowing the rail. This rule
     exists because the rail is what decides how much time there is — a card
     chargeback can be fought for months, an on-chain transfer for nothing.
+
+    It requires an external destination, not merely a chain. A platform that
+    settles internally in stablecoin puts a chain on almost every row it
+    writes, including wallet-to-card movements that never leave: gating on
+    the chain alone flagged 1,352 of one issuer's 11,868 transactions, none
+    of which had gone anywhere. Value has only left when there is somewhere
+    it left to.
     """
 
     techniques = ("F1018",)
@@ -30,6 +37,7 @@ class CryptoCashOutRule(BaseRule):
         return (
             isinstance(self.event, TransactionEvent)
             and event_value(self.event, "chain") is not None
+            and event_value(self.event, "counterparty_address") is not None
             and self.scope.account_activity is not None
         )
 

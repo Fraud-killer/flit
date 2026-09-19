@@ -87,3 +87,6 @@ Skypay records/
 # published matrix still matches the registered rules. coverage.json stays
 # ignored — it is regenerated from the same command.
 !app/core/taxonomy/f3_catalogue.json
+# The evidence ledger is what a measured maturity claim rests on, and the
+# test suite rejects such a claim without it.
+!evidence.json
