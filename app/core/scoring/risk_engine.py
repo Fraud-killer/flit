@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import timedelta
 from django.utils import timezone
 
-from core.scoring.weights import RiskWeights, DEFAULT_WEIGHTS
+from core.scoring.weights import RiskWeights, RiskThresholds, DEFAULT_WEIGHTS, DEFAULT_THRESHOLDS
 
 
 class RiskLevel(str, Enum):
@@ -50,6 +50,11 @@ class RiskScore:
     should_block: bool
     should_review: bool
     confidence: float
+    should_challenge: bool = False
+    # How much of the identity signal FLIT expected actually arrived, 0.0–1.0,
+    # or None when the caller did not measure it. Reported alongside the score
+    # so a thin verdict can be told apart from a well-evidenced one.
+    coverage: Optional[float] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -71,14 +76,21 @@ class RiskScore:
             "recommendation": self.recommendation,
             "should_block": self.should_block,
             "should_review": self.should_review,
+            "should_challenge": self.should_challenge,
             "confidence": round(self.confidence, 4),
+            "coverage": self.coverage,
             "metadata": self.metadata,
         }
 
 
 class RiskEngine:
-    def __init__(self, weights: Optional[RiskWeights] = None):
+    def __init__(
+        self,
+        weights: Optional[RiskWeights] = None,
+        thresholds: Optional[RiskThresholds] = None,
+    ):
         self.weights = weights or DEFAULT_WEIGHTS
+        self.thresholds = thresholds or DEFAULT_THRESHOLDS
 
     def calculate_risk(
         self,
@@ -89,6 +101,7 @@ class RiskEngine:
         device_trust_score: Optional[float] = None,
         account_age_days: Optional[int] = None,
         previous_fraud_count: int = 0,
+        coverage: Optional[float] = None,
     ) -> RiskScore:
         factors = []
 
@@ -97,7 +110,11 @@ class RiskEngine:
             context = msg.get("context") or {}
             weight = self.weights.get_weight(code, default=context.get("score"))
 
-            base_score = 1.0
+            # `weight` is how much this kind of evidence counts; `severity` is
+            # how bad this particular instance is. A rule that grades its own
+            # findings sets severity; anything without one is taken at full
+            # strength, which is how every rule behaved before.
+            base_score = self._severity(context)
 
             if previous_fraud_count > 0:
                 base_score *= (1 + 0.1 * min(previous_fraud_count, 5))
@@ -127,9 +144,20 @@ class RiskEngine:
         total_score = max(0.0, min(1.0, total_score))
 
         level = RiskLevel.from_score(total_score)
-        recommendation = self._get_recommendation(level, factors)
-        should_block = level == RiskLevel.CRITICAL or total_score >= 0.85
-        should_review = level in [RiskLevel.HIGH, RiskLevel.CRITICAL] or total_score >= 0.5
+        should_block = total_score >= self.thresholds.block_at
+        should_review = total_score >= self.thresholds.review_at
+
+        # A step-up sits below a block deliberately. At the signup surface the
+        # evidence is thin by nature, and blocking on thin evidence costs real
+        # customers; a challenge makes the eleventh account cost as much as
+        # the first without charging the honest user anything but one puzzle.
+        should_challenge = (
+            not should_block and total_score >= self.thresholds.challenge_at
+        )
+
+        recommendation = self._get_recommendation(
+            level, factors, should_challenge=should_challenge,
+        )
 
         confidence = self._calculate_confidence(factors, historical_risk_scores)
 
@@ -140,19 +168,45 @@ class RiskEngine:
             recommendation=recommendation,
             should_block=should_block,
             should_review=should_review,
+            should_challenge=should_challenge,
             confidence=confidence,
+            coverage=coverage,
             metadata={
                 "factors_count": len(factors),
                 "event_category": event_category,
                 "has_historical_data": historical_risk_scores is not None,
+                "coverage": coverage,
             },
         )
+
+    @staticmethod
+    def _severity(context: Dict[str, Any]) -> float:
+        """
+        How bad one finding is, 0.0–1.0, defaulting to full strength.
+
+        Only `severity` is read. A rule's `score` is left alone: it already
+        serves as the weight fallback for codes with no configured weight, and
+        reusing it here would silently rescale every existing rule.
+        """
+        severity = context.get("severity")
+
+        if severity is None:
+            return 1.0
+
+        try:
+            return max(0.0, min(float(severity), 1.0))
+        except (TypeError, ValueError):
+            return 1.0
 
     def _calculate_combined_score(
         self,
         factors: List[RiskFactor],
         event_category: str,
     ) -> float:
+        # Zero-weight factors (data completeness markers) are reported but
+        # are not evidence, so they must not dilute the average either.
+        factors = [factor for factor in factors if factor.weight > 0]
+
         if not factors:
             return 0.0
 
@@ -172,9 +226,24 @@ class RiskEngine:
 
         return combined
 
-    def _get_recommendation(self, level: RiskLevel, factors: List[RiskFactor]) -> str:
+    def _get_recommendation(
+        self,
+        level: RiskLevel,
+        factors: List[RiskFactor],
+        *,
+        should_challenge: bool = False,
+    ) -> str:
         if level == RiskLevel.CRITICAL:
             return "BLOCK: High-risk activity detected. Recommend blocking transaction and triggering manual review."
+
+        if should_challenge:
+            names = ", ".join(f.code for f in sorted(
+                factors, key=lambda item: item.weighted_score, reverse=True,
+            )[:3])
+            return (
+                f"CHALLENGE: Step up verification before proceeding ({names})."
+                " Evidence is short of a block but the action should cost more than one request."
+            )
 
         if level == RiskLevel.HIGH:
             high_weight_factors = [f for f in factors if f.weight >= 0.7]

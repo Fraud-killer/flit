@@ -44,6 +44,32 @@ Think: **"Cloudflare, but for fraud."** — **"Seatbelts, not ambulances."**
 
 ---
 
+## What FLIT Detects, and How Well
+
+FLIT maps its detectors onto the **[MITRE Fight Fraud Framework (F3)](https://github.com/center-for-threat-informed-defense/fight-fraud-framework)** — the fraud taxonomy MITRE's Center for Threat-Informed Defense published in April 2026 with JPMorganChase, Citigroup, Lloyds Banking Group, Standard Chartered and FS-ISAC.
+
+We do not define our own vocabulary. A risk team can ask "which F3 techniques do you cover?" and get an answer in the language they already use.
+
+**[COVERAGE.md](COVERAGE.md)** is that answer. It is generated from the registered rules — never written by hand — and CI fails if it drifts:
+
+```bash
+python manage.py coverage_matrix --out ../COVERAGE.md --json ../coverage.json
+```
+
+It reports three buckets, not two, because counting techniques FLIT has no telemetry for as "gaps" would be dishonest arithmetic:
+
+| | Meaning |
+|---|---|
+| **Covered** | At least one detector claims the technique |
+| **Addressable** | FLIT receives signals that could detect it, and does not yet — the roadmap |
+| **Outside telemetry** | Happens where a server-side decision layer has no eyes, with the reason stated |
+
+Every detector also declares where it sits on an **evidence ladder** — proposed, synthetic-tested, backtested, shadow-validated, production-observed, outcome-calibrated — and the test suite rejects any claim above `proposed` that cannot name the evidence behind it. From `backtested` upward the claim is numerical, so it must point at an entry in the evidence ledger written by the backtest harness, not at an assertion.
+
+`Proposed` is not a criticism. It means a detector is reasoned from how the fraud works and has not yet been measured against labelled history. Publishing that honestly is the point: a fraud tool whose effectiveness numbers cannot be traced to a dataset is asking to be taken on faith.
+
+---
+
 ## Features
 
 ### Core Security Capabilities
@@ -54,6 +80,7 @@ Think: **"Cloudflare, but for fraud."** — **"Seatbelts, not ambulances."**
 - **Velocity Checks** - Detect rapid-fire requests and unusual activity patterns
 - **Impossible Travel Detection** - Flag logins from geographically impossible locations
 - **Account Takeover Prevention** - Multi-signal detection for compromised accounts
+- **Credential Surface Monitoring** - Reset-to-login timing, scripted credential actions, and one origin working many accounts' resets (the October 2026 takeover pattern)
 
 ### Security Infrastructure
 
@@ -194,6 +221,8 @@ curl -X POST http://localhost:18000/api/v1/applications/{app_id}/audit-transacti
 
 `ip_address` and `user_agent` are the **end user's** values. FLIT receives the request from your server, so it cannot see them itself. When omitted, the IP and user agent Fingerprint recorded for `visit_id` are used.
 
+For mule detection, send `counterparty_id` (who the money came from or went to) and `account_age_days`. Counterparties are what turn "six credits" into "six different senders", which is the difference between a busy account and a collection point.
+
 Payment rules also read optional payment fields when you send them: `status`, `gateway_message`, `provider_responses`, `card_fingerprint`, `card_bin`, `payment_instrument`, `browser_details`, `billing` and `shipping`.
 
 ### Response
@@ -266,6 +295,63 @@ curl -X POST http://localhost:18000/api/v1/applications/{app_id}/outcomes \
 ```
 
 Labels: `fraud`, `chargeback`, `legit`, `false_positive`. Send `event_id` (your transaction id) instead of `audit_id` to label that event's most recent audit.
+
+### Review Decisions
+
+Every decision is queryable, and anything that comes back for review opens a **case**.
+
+```bash
+# The decision feed. Filter by level, label, factor, client_id, device_id,
+# days, unlabelled=1.
+curl "http://localhost:18000/api/v1/applications/{app_id}/decisions?factor=multi_accounting&days=7" \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}"
+
+# The review queue (status=open by default; `all` for everything).
+curl "http://localhost:18000/api/v1/applications/{app_id}/cases" \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}"
+
+# Closing a case labels the decision behind it: confirmed_fraud -> fraud,
+# cleared -> legit. This is where most training data comes from.
+curl -X PATCH "http://localhost:18000/api/v1/applications/{app_id}/cases/{case_id}" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "confirmed_fraud", "note": "Card testing"}'
+```
+
+### Backtest a Portfolio
+
+Replay a merchant's historical payments through the rules and see what FLIT would have caught, before they integrate anything.
+
+```bash
+python manage.py backtest history.csv --mapping mapping.json \
+  --application "Fintech A" --create --out report.json
+```
+
+It reports the threshold curve (what each block threshold would have caught and cost), and ranks rules by lift — how much more often each fires on fraud than on good customers. `backtest_overlap` compares two portfolios and measures how much of one's fraud was already visible in the other.
+
+See [docs/backtesting.md](docs/backtesting.md) for the mapping format, the data to ask for, and how to read the report.
+
+### Simulate a Policy Change
+
+Ask what a change *would have done*, instead of shipping it and waiting for complaints. FLIT re-scores recorded decisions under candidate weights and thresholds and compares them against the labels you have reported.
+
+```bash
+curl -X POST "http://localhost:18000/api/v1/applications/{app_id}/simulations" \
+  -H "Content-Type: application/json" \
+  -d '{"days": 30, "thresholds": {"block_at": 0.5}, "weights": {"bot_detected": 0.9}}'
+```
+
+```json
+{
+  "decisions": 4820, "labelled": 312,
+  "baseline":  {"blocked": 41, "caught_fraud": 22, "missed_fraud": 18, "false_positives": 3, "precision": 0.88, "recall": 0.55},
+  "candidate": {"blocked": 96, "caught_fraud": 34, "missed_fraud": 6,  "false_positives": 11, "precision": 0.76, "recall": 0.85},
+  "changes": {"newly_blocked": 55, "newly_blocked_fraud": 12, "newly_blocked_legit": 8, "newly_allowed": 0}
+}
+```
+
+Read it as a trade: 12 more frauds caught, 8 more good customers blocked. Baseline and candidate are both recomputed the same way, so the comparison is exact even though a recomputed score can differ slightly from the one recorded at decision time.
+
+Decision thresholds are `block_at` (0.7) and `review_at` (0.5).
 
 ### Look Up a Device
 
@@ -352,6 +438,33 @@ Payment rules attach a per-signal score to each finding; it is used as the weigh
 |------|-------------|-------------|
 | `IPReputationRule` | Tor exit nodes, blocklisted, proxy, VPN, datacenter and high-risk-country IPs | 0.3 – 0.9 |
 | `BotSignalRule` | Automated user agents and Fingerprint bad-bot detection (search crawlers allowed) | 0.7 |
+
+### Money Mule Rules
+
+Mule accounts are recognised by the shape of money moving through them, not by any single transaction. These rules read the account's recorded history, so they need `POST /audit-transaction` to be called for both credits and debits.
+
+| Rule | Description | Risk Weight |
+|------|-------------|-------------|
+| `PassThroughRule` | Account pays out most of what it just received (`pass_through_funds`) | 0.75 |
+| `StructuringRule` | Money arriving from many different senders (`many_unique_payers`), or a burst of credits (`credit_structuring`) | 0.55 – 0.7 |
+| `DormantAwakeningRule` | A long-quiet account suddenly moving money (`dormant_account_activity`) | 0.5 |
+| `AccountFarmingRule` | Several accounts first seen on one device within a day (`account_farming`) | 0.8 |
+| `MuleNetworkRule` | Account shares a device with accounts already confirmed fraudulent (`mule_network_device`) | 0.9 |
+
+`MuleNetworkRule` is what the device graph plus your reported outcomes buy together: mules work in sets, and once one is confirmed, the rest of the set becomes visible.
+
+Thresholds default to 80% paid out within an hour, 5 senders a day, 8 credits a day, 60 days of dormancy, and 3 new accounts per device per day. Override them per application on `Policy.mule_thresholds`.
+
+### Look Up an Account
+
+The profile a fraud team opens when a payment is held:
+
+```bash
+curl "http://localhost:18000/api/v1/applications/{app_id}/accounts/{client_id}" \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}"
+```
+
+Returns 30-day money flow (credits, debits, unique payers and payees, and the pass-through ratio), every device the account has used and how many other accounts share it, which mule signals have fired and how often, reported labels and open cases.
 
 ### Device Consistency Rules
 

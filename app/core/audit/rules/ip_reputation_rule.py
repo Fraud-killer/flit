@@ -1,8 +1,8 @@
 from devkit.message import Message
-from core.audit.events import ClientEvent, TransactionEvent
+from core.audit.events import SIGNAL_EVENTS
 from core.intelligence.ip_intelligence import IPIntelligence
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 from .visit_signals import fetch_visit_signals, event_value
 
 
@@ -15,9 +15,14 @@ class IPReputationRule(BaseRule):
     event has no `ip_address`, the IP Fingerprint saw for the visit is used.
     """
 
+    techniques = ("T1583", "F1030")
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_intelligence.py::TestIPReputationRule"
+
     @property
     def applies(self):
-        return isinstance(self.event, (ClientEvent, TransactionEvent)) and (
+        return isinstance(self.event, SIGNAL_EVENTS) and (
             event_value(self.event, "ip_address") is not None
             or event_value(self.event, "visit_id") is not None
         )
@@ -40,6 +45,12 @@ class IPReputationRule(BaseRule):
         )
 
         checks = [
+            (
+                "implausible_client_ip",
+                info.is_implausible, False,
+                "Client address cannot be an end user's (reserved range, loopback "
+                "or public resolver): the forwarded header is caller-controlled",
+            ),
             (
                 "tor_exit_node",
                 info.is_tor, visit_flag("tor"),

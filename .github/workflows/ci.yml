@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      DJANGO_SETTINGS_MODULE: kernel.settings
+      DATABASE_URL: sqlite:///test.db
+      SECRET_KEY: ci-secret-key
+      DEBUG: "true"
+      # Keep the suite off the network: DomainIntelligence would otherwise
+      # make DNS-over-HTTPS and RDAP calls.
+      DOMAIN_LOOKUPS_ENABLED: "false"
+      CHAIN_LOOKUPS_ENABLED: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip pipenv
+          cd app && pipenv install --system --deploy --dev
+
+      - name: Generate an encryption key
+        run: |
+          echo "MCRYPT_KEY=$(python -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())')" >> "$GITHUB_ENV"
+
+      - name: Tests
+        run: python -m pytest tests -q
+
+      - name: Migrations are complete
+        run: cd app && python manage.py makemigrations --check --dry-run
+
+      - name: Coverage matrix is current
+        # The matrix is a claim FLIT makes to customers. If it can drift from
+        # the registered rules, it will — so the build fails when it has.
+        run: cd app && python manage.py coverage_matrix --out ../COVERAGE.md --check

@@ -3,7 +3,7 @@ from asgiref.sync import sync_to_async
 from devkit.checks import is_present
 
 from core.audit.logger import AuditLogger
-from core.audit.events import ClientEvent, TransactionEvent
+from core.audit.events import ClientEvent, TransactionEvent, AuthenticationEvent, RegistrationEvent
 from core.audit.models import AuditLogCategory, AuditLogLevel
 
 
@@ -42,6 +42,27 @@ class AuditRecorder:
 
     @classmethod
     def write(cls, *, event, policy, scope, risk_result, rule_names):
+        audit_log = cls.write_log(
+            event=event,
+            policy=policy,
+            scope=scope,
+            risk_result=risk_result,
+            rule_names=rule_names,
+        )
+
+        if risk_result.should_review:
+            cls.open_case(audit_log, policy.application)
+
+        return audit_log
+
+    @classmethod
+    def open_case(cls, audit_log, application):
+        from core.models import Case
+
+        return Case.objects.create(audit_log=audit_log, application=application)
+
+    @classmethod
+    def write_log(cls, *, event, policy, scope, risk_result, rule_names):
         application = policy.application
         identity = scope.device_identity
 
@@ -51,7 +72,7 @@ class AuditRecorder:
             action=cls.action(event),
             actor_type="client",
             actor_id=event.account_id,
-            resource_type="transaction" if isinstance(event, TransactionEvent) else "client_event",
+            resource_type=cls.resource_type(event),
             resource_id=cls.value(event, "id"),
             application_id=application.id,
             organization_id=getattr(application, "organization_id", None),
@@ -64,34 +85,105 @@ class AuditRecorder:
             context=dict(
                 visit_id=cls.value(event, "visit_id"),
                 device_id=str(identity.id) if identity else None,
+                # Credential actions: what was done and how the credential
+                # was presented, so the takeover rules can read the sequence
+                # back without re-parsing the event.
+                action=cls.value(event, "action"),
+                auth_method=cls.value(event, "auth_method"),
+                second_factor=cls.value(event, "second_factor"),
                 amount=cls.value(event, "amount"),
                 currency_code=cls.value(event, "currency_code"),
+                transaction_type=cls.value(event, "type"),
+                counterparty_id=cls.value(event, "counterparty_id"),
+                card_fingerprint=cls.value(event, "card_fingerprint"),
+                # Crypto movement, recorded as the normalised correlation key
+                # rather than the raw address, so history compares the way the
+                # identity ladder does.
+                chain=cls.value(event, "chain"),
+                asset=cls.value(event, "asset"),
+                counterparty_key=cls.counterparty_key(event),
                 risk_level=risk_result.level.value,
                 recommendation=risk_result.recommendation,
+                # The decision FLIT reached, not what it was allowed to do
+                # with it: a shadow run has to produce the same history an
+                # enforcing one would, or measuring it later is meaningless.
                 should_block=risk_result.should_block,
+                should_challenge=risk_result.should_challenge,
+                enforcement=getattr(application, "enforcement", "shadow"),
+                coverage=risk_result.coverage,
                 rules=rule_names,
+                # The global identity keys this decision touched. Kept so that
+                # labelling it later — a case confirmed, a chargeback
+                # reported — can attribute that outcome back to them without
+                # re-resolving an event whose signals have since moved on.
+                identity_key_ids=(
+                    scope.identity_ladder.network_key_ids()
+                    if scope.identity_ladder else []
+                ),
+                # Kept so a simulation can re-score this decision under
+                # different weights without re-running the rules.
+                factors=[
+                    dict(code=factor.code, weight=factor.weight, score=factor.score)
+                    for factor in risk_result.factors
+                ],
             ),
         )
 
     @staticmethod
+    def counterparty_key(event):
+        """The normalised key for where funds were sent, if anywhere."""
+        from core.intelligence import wallet_intelligence
+
+        address = AuditRecorder.value(event, "counterparty_address")
+
+        if not address:
+            return None
+
+        return wallet_intelligence.address_key(
+            address, AuditRecorder.value(event, "chain"),
+        )
+
+    @staticmethod
     def value(event, name):
+        """Declared attributes first, then the payment fields in `extra`."""
         value = getattr(event, name, None)
+
+        if not is_present(value):
+            value = (getattr(event, "extra", None) or {}).get(name)
+
         return value if is_present(value) else None
 
     @classmethod
     def category(cls, event):
-        if isinstance(event, ClientEvent):
+        if isinstance(event, (ClientEvent, AuthenticationEvent)):
             return AuditLogCategory.AUTHENTICATION
         return AuditLogCategory.TRANSACTION
 
     @classmethod
+    def resource_type(cls, event):
+        if isinstance(event, TransactionEvent):
+            return "transaction"
+        if isinstance(event, AuthenticationEvent):
+            return "authentication"
+        return "client_event"
+
+    @classmethod
     def action(cls, event):
+        if isinstance(event, AuthenticationEvent):
+            return cls.value(event, "action")
         if isinstance(event, ClientEvent):
             return cls.value(event, "action") or "client_event"
+        if isinstance(event, RegistrationEvent):
+            # Recorded by name so a session can tell the accounts an origin
+            # created from the ones it merely touched.
+            return cls.value(event, "action") or "registration"
         return f"transaction_{cls.value(event, 'type') or 'unknown'}"
 
     @staticmethod
     def outcome(event):
+        if isinstance(event, AuthenticationEvent):
+            return "success" if event.succeeded else "failure"
+
         status = str(event.extra.get("status", "")).lower()
         if status in SUCCESS_STATUSES:
             return "success"

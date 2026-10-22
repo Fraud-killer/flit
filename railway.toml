@@ -1,0 +1,21 @@
+# Railway deployment for the FLIT API.
+#
+# Migrations run as a pre-deploy step rather than in the start command: the
+# start command runs once per replica, so baking migrations into it would have
+# every replica racing to apply the same schema change.
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile.app"
+
+[deploy]
+startCommand = "daphne -b 0.0.0.0 -p $PORT kernel.asgi:application"
+preDeployCommand = "python manage.py migrate --no-input"
+
+# /health/ is exempt from the HTTPS redirect (see kernel.settings), so the
+# check sees the app rather than a 301.
+healthcheckPath = "/health/"
+healthcheckTimeout = 30
+
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

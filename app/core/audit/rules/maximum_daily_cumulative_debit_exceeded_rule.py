@@ -3,10 +3,14 @@ from core.money import Money, init_money
 from .money_limits import currency_mismatch
 from core.audit.events import TransactionEvent
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 
 
 class MaximumDailyCumulativeDebitExceededRule(BaseRule):
+
+    kind = RuleKind.CONTROL
+    maturity = Maturity.PROPOSED
+
     @property
     def applies(self):
         return (

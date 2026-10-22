@@ -9,6 +9,7 @@ from core.scoring import RiskEngine, RiskLevel
 from core.audit.recorder import AuditRecorder
 from core.audit.rules.visit_signals import fetch_event_visit
 from core.services.resolve_device_identity import ResolveDeviceIdentity
+from core.services.resolve_identity_ladder import resolve_identity_ladder
 from core.realtime.alerts import AlertManager, Alert, AlertLevel, AlertCategory
 
 
@@ -43,11 +44,37 @@ class Auditor:
         # IP & Bot Intelligence Rules
         rules.IPReputationRule,
         rules.BotSignalRule,
+        # Signup Surface Rules
+        rules.ExpectedSignalRule,
+        rules.DisposableEmailRule,
+        rules.EmailPatternRule,
+        rules.DomainReputationRule,
+        # Crypto Rails
+        rules.CryptoCashOutRule,
+        rules.NewWithdrawalAddressRule,
+        rules.CollectionWalletRule,
+        rules.FreshFundingWalletRule,
+        rules.SanctionedAddressRule,
+        # Shared Protection Network
+        rules.NetworkReputationRule,
+        rules.ChallengeEvasionRule,
         # Device Graph Rules
         rules.MultiAccountingRule,
         rules.AccountSharingRule,
         rules.DeviceTamperingRule,
         rules.DeviceConsistencyRule,
+        # Money Mule Rules
+        rules.PassThroughRule,
+        rules.StructuringRule,
+        rules.DormantAwakeningRule,
+        rules.AccountFarmingRule,
+        rules.MuleNetworkRule,
+        # Credential Surface Rules
+        rules.ResetToLoginRule,
+        rules.AutomatedCredentialActionRule,
+        rules.CredentialResetStormRule,
+        # Session Shape
+        rules.SessionShapeRule,
     )
 
     @classmethod
@@ -59,10 +86,25 @@ class Auditor:
         send_alerts: bool = True,
         include_historical: bool = True,
         record: bool = True,
+        device_identity=None,
     ):
         active_rules = list()
         scope = Scope()
-        scope.device_identity = await cls._resolve_device_identity(event, policy, scope)
+        visit = await fetch_event_visit(event, scope, cls.__name__)
+        # A caller that already knows the device (a replay of historical
+        # data, say) passes it in; otherwise it comes from the visit.
+        scope.device_identity = device_identity or await cls._resolve_device_identity(
+            event, policy, scope, visit=visit,
+        )
+        # Resolved after the device so the device becomes the ladder's top
+        # rung when there is one, and before the rules so a rule counting
+        # accounts on a key counts this event too.
+        scope.identity_ladder = await resolve_identity_ladder(
+            event=event, policy=policy, scope=scope,
+            visit=visit, device_identity=scope.device_identity,
+            write=record,
+        )
+        scope.account_activity = await cls._load_account_activity(event, policy)
 
         for rule_class in cls.rule_classes:
             rule = rule_class(event=event, policy=policy, scope=scope)
@@ -78,7 +120,11 @@ class Auditor:
 
         rule_names = [rule.__class__.__name__ for rule in active_rules]
 
-        risk_engine = RiskEngine()
+        # The weights this application has learned from its own outcomes,
+        # or the defaults until it has. Same arithmetic the calibrator and
+        # the simulator use, so what they predicted is what this does.
+        from core.calibration import engine_for
+        risk_engine = engine_for(policy)
 
         message_dicts = [
             {
@@ -118,8 +164,10 @@ class Auditor:
         risk_result = risk_engine.calculate_risk(
             message_dicts,
             event_category=event_category,
+            account_age_days=getattr(event, "account_age_days", None) or None,
             historical_risk_scores=historical_scores,
             device_trust_score=device_trust_score,
+            coverage=scope.identity_ladder.coverage if scope.identity_ladder else None,
         )
 
         if send_alerts and risk_result.level in [RiskLevel.HIGH, RiskLevel.CRITICAL]:
@@ -135,23 +183,46 @@ class Auditor:
                 rule_names=rule_names,
             )
 
+        # In shadow, `should_block` and `should_challenge` come back false —
+        # not merely flagged as unenforced. An integration reads
+        # `if (decision.should_block) reject()`, so the field that drives that
+        # branch has to be the safe one; anything else means a shadow
+        # deployment turns customers away the first time someone forgets to
+        # check a second flag. What FLIT actually decided is reported
+        # alongside as `would_block`, and it is the decision that gets
+        # recorded, so history and the evidence ledger stay honest.
+        # Safe default: anything that cannot tell us it is enforcing is
+        # treated as shadow, so a misconfiguration suppresses actions rather
+        # than taking them.
+        application = policy.application
+        enforcing = bool(getattr(application, "is_enforcing", False))
+
         return Struct(
             audit_id=str(audit_log.id) if audit_log else None,
             device_id=str(scope.device_identity.id) if scope.device_identity else None,
+            identity=scope.identity_ladder.describe() if scope.identity_ladder else None,
             risk_score=risk_result.total_score,
             risk_level=risk_result.level.value,
             rules=rule_names,
             reasons=reasons,
-            should_block=risk_result.should_block,
+            enforcement=getattr(application, "enforcement", "shadow"),
+            should_block=risk_result.should_block and enforcing,
+            should_challenge=risk_result.should_challenge and enforcing,
+            # Review is internal: a case in a queue costs a reviewer's
+            # attention, not a customer's signup, so it happens in shadow too.
             should_review=risk_result.should_review,
+            would_block=risk_result.should_block,
+            would_challenge=risk_result.should_challenge,
             recommendation=risk_result.recommendation,
             confidence=risk_result.confidence,
+            coverage=risk_result.coverage,
             factors=[f.code for f in risk_result.factors],
         )
 
     @classmethod
-    async def _resolve_device_identity(cls, event, policy, scope):
-        visit = await fetch_event_visit(event, scope, cls.__name__)
+    async def _resolve_device_identity(cls, event, policy, scope, visit=None):
+        if visit is None:
+            visit = await fetch_event_visit(event, scope, cls.__name__)
         if visit is None:
             return None
 
@@ -163,6 +234,22 @@ class Auditor:
             )
         except Exception:
             logger.exception("Could not resolve device identity")
+            return None
+
+    @classmethod
+    async def _load_account_activity(cls, event, policy):
+        from core.services.account_activity import AccountActivity
+
+        if not event.account_id:
+            return None
+
+        try:
+            return await sync_to_async(AccountActivity.load)(
+                application=policy.application,
+                client_id=event.account_id,
+            )
+        except Exception:
+            logger.exception("Could not load account activity")
             return None
 
     @classmethod

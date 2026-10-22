@@ -8,6 +8,7 @@ geographically impossible combinations.
 
 from typing import Any
 from .payment_rule import PaymentRule
+from .base_rule import Maturity, RuleKind
 
 
 class FakeAddressRule(PaymentRule):
@@ -21,6 +22,12 @@ class FakeAddressRule(PaymentRule):
     - Generic zip codes (12345, 00000)
     - Country/city mismatches
     """
+
+    techniques = ("F1020",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_fraud_rules.py::TestFakeAddressRule"
+
     
     trigger_fields = ("billing", "shipping")
 

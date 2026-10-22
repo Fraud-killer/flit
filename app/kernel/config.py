@@ -75,6 +75,61 @@ class Config(metaclass=ConfigMeta):
         return ctx.load.env("FINGERPRINT_MANAGEMENT_API_KEY")
 
     @variable
+    def turnstile_secret_key(self, ctx):
+        """
+        Fallback Cloudflare Turnstile secret, used when an application has not
+        configured its own. Most deployments set it per application instead.
+        """
+        return ctx.load.env("TURNSTILE_SECRET_KEY")
+
+    @variable
+    def domain_lookups_enabled(self, ctx):
+        """
+        Whether DomainIntelligence may make outbound DNS-over-HTTPS and RDAP
+        calls. On by default; deployments with no egress turn it off, and the
+        test suite disables it so nothing reaches the network.
+        """
+        value = ctx.load.env("DOMAIN_LOOKUPS_ENABLED", True)
+        value, error = execute(to_bool, value)
+        if not error: return value
+        raise VariableError(msg_to_bool.text)
+
+    @variable
+    def sanctions_list_url(self, ctx):
+        """
+        Where the OFAC SDN list is fetched from. Defaults to the US Treasury
+        publication. The file is parsed as XML, so point this only at a
+        source you trust as much as Treasury itself.
+        """
+        return ctx.load.env(
+            "SANCTIONS_LIST_URL",
+            "https://www.treasury.gov/ofac/downloads/sdn.xml",
+        )
+
+    @variable
+    def chain_lookups_enabled(self, ctx):
+        """
+        Whether WalletChainIntelligence may ask a public RPC node whether an
+        address has any history. On by default; deployments with no egress
+        turn it off, and the test suite disables it so nothing reaches the
+        network.
+        """
+        value = ctx.load.env("CHAIN_LOOKUPS_ENABLED", True)
+        value, error = execute(to_bool, value)
+        if not error: return value
+        raise VariableError(msg_to_bool.text)
+
+    @variable
+    def chain_rpc_urls(self, ctx):
+        """
+        JSON map of chain name to JSON-RPC endpoint, merged over the public
+        defaults in core.intelligence.wallet_intelligence. Set it to use your
+        own nodes rather than the shared public ones.
+        """
+        value = ctx.load.env("CHAIN_RPC_URLS")
+        return json.loads(value) if value else {}
+
+    @variable
     def redis_url(self, ctx):
         return ctx.load.env("REDIS_URL", "redis://localhost:6379/0")
 

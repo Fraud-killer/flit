@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from django.core.cache import cache
 
 from core.audit.rules.payment_rule import PaymentRule
+from .base_rule import Maturity, RuleKind
 
 
 @dataclass
@@ -36,6 +37,11 @@ class IPConcentrationRule(PaymentRule):
     - Both IPs were AWS datacenter IPs
     - Multiple unique customers from same IP
     """
+
+    techniques = ("T1583",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_fraud_rules.py::TestIPConcentrationRule"
 
     THRESHOLDS = {
         "tx_per_ip_per_hour": 20,

@@ -3,6 +3,7 @@ from devkit.struct import Struct
 from asgiref.sync import sync_to_async
 from core.services.fingerprint import FetchVisitData
 from core.services.collect_visit import CollectVisit
+from core.services.account_activity import AccountActivity
 from core.audit.collected_visit import build_collected_visit
 from core.audit.lock_cache import LockCache, lockcache
 
@@ -10,6 +11,14 @@ from core.audit.lock_cache import LockCache, lockcache
 class Scope(LockCache):
     # The DeviceIdentity resolved for the audited event, set by Auditor.
     device_identity = None
+
+    # Every correlation key resolved for the event, strongest first, set by
+    # Auditor. The device identity above is its strongest rung; the weaker
+    # rungs are what keeps correlation working when there is no device at all.
+    identity_ladder = None
+
+    # The account's recent transactions, set by Auditor.
+    account_activity = None
 
     @lockcache(lambda visit_id: visit_id)
     async def fetch_visit(self, visit_id):

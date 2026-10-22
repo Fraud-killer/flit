@@ -1,0 +1,17 @@
+This directory contains a derived index of the MITRE Fight Fraud Framework
+(F3) v1.1 — technique identifiers, technique names and tactic assignments
+only — in f3_catalogue.json.
+
+  MITRE Fight Fraud Framework (F3)
+  Copyright MITRE Engenuity / Center for Threat-Informed Defense
+  Licensed under the Apache License, Version 2.0
+  https://github.com/center-for-threat-informed-defense/fight-fraud-framework
+
+FLIT maps its detectors onto F3 identifiers so that coverage can be stated in
+a vocabulary the financial industry already uses. MITRE does not endorse,
+sponsor or certify FLIT, and no such relationship is implied. "MITRE",
+"ATT&CK" and "Fight Fraud Framework" are trademarks of their respective
+owners and are used here only to identify the framework being referenced.
+
+For technique descriptions, procedures and the full framework, see the
+upstream project above.

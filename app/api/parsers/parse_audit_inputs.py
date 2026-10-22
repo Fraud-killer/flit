@@ -10,6 +10,8 @@ from core.messages.applications import msg_app_ref_exist
 modes_dict = {
     "client": events.ClientEvent, 
     "transaction": events.TransactionEvent,
+    "registration": events.RegistrationEvent,
+    "authentication": events.AuthenticationEvent,
 }
 
 

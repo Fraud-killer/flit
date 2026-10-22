@@ -5,9 +5,15 @@ from devkit.message import Message
 from core.audit.events import TransactionEvent
 from core.audit.rules.base_rule import BaseRule
 from core.audit.lock_cache import lockcache, LockCache
+from .base_rule import Maturity, RuleKind
 
 
 class VelocityCheckRule(BaseRule, LockCache):
+
+    techniques = ("T1110",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.PROPOSED
+
     VELOCITY_WINDOWS = {
         "1_minute": timedelta(minutes=1),
         "5_minutes": timedelta(minutes=5),

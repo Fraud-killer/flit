@@ -1,7 +1,7 @@
 from devkit.message import Message
-from core.audit.events import ClientEvent, TransactionEvent
+from core.audit.events import SIGNAL_EVENTS
 
-from .base_rule import BaseRule
+from .base_rule import BaseRule, Maturity, RuleKind
 from .visit_signals import fetch_visit_signals, event_value
 
 
@@ -11,6 +11,11 @@ class DeviceTamperingRule(BaseRule):
     browsers, emulators and VMs, rooted/jailbroken phones, hooking frameworks,
     cloned apps, remote control, location spoofing and MITM proxies.
     """
+
+    techniques = ("F1023",)
+    kind = RuleKind.DETECTION
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_device_graph.py::TestDeviceIntegrity"
 
     # visit.device_signals flag -> (message code, text)
     SIGNALS = {
@@ -29,7 +34,7 @@ class DeviceTamperingRule(BaseRule):
     @property
     def applies(self):
         return (
-            isinstance(self.event, (ClientEvent, TransactionEvent))
+            isinstance(self.event, SIGNAL_EVENTS)
             and event_value(self.event, "visit_id") is not None
         )
 
