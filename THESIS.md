@@ -187,6 +187,43 @@ Every transaction that passes through FLIT receives:
 
 ---
 
+## Where FLIT Goes Next (set 2026-10-22)
+
+On 20 October 2026 one operator — almost certainly an agent with a browser
+and a shell — created 226 accounts and 17 merchant tenants against a live
+card issuer, rotated six client strings, tested SSRF, mass assignment and
+cross-tenant access, named each probe after what it was testing, and took 18
+accounts in 52 minutes. The attacker is now cheaper than the defender's
+review queue, adapts inside a single session, and reads the merchant's API
+the way an engineer reads a repo.
+
+A rules engine that scores events loses to that on arithmetic. FLIT evolves
+into:
+
+**A system that learns from outcomes on its own, scores sessions instead of
+events, probes the merchant before the attacker does, and shares what it
+sees across merchants in real time.**
+
+The four moves, each built on something already here:
+
+| Move | From | To | Foundation already in place |
+|---|---|---|---|
+| **Learns on its own** — *first cut built 2026-10-22* | Cases a reviewer labels, thresholds a person sets | Outcomes recalibrate thresholds nightly; a human reviews the calibration, not the cases. `Calibrator` reads the month's labelled decisions, proposes bounded weight moves per code from measured precision, re-scores the month under each and together, accepts only what passes the guardrails (false positives ≤ 1%, no rise beyond tolerance, no drop in recall), and writes every run to a `CalibrationRun`. Decisions now use the calibrated engine (`engine_for`), so the policy a simulation predicted is the policy that decides. `manage.py calibrate --all --apply` nightly; `GET /calibrations` is the review queue | Evidence ledger, backtest harness, `simulate_policy`; `tests/unit/test_self_calibration.py` |
+| **Scores sessions** — *first cut built 2026-10-22* | A fixed threshold per event (90 s, 3 accounts, a UA list) | The sequence of actions from one origin over an hour, scored against what a human session looks like. `SessionShapeRule` reads one origin's hour — accounts touched, client families, cadence, accounts it did not create, the takeover motif repeating — against `SessionBaseline`, percentiles of the merchant's own recent sessions. The October replay with the reset slowed to 150 s and a different client per account steps over every event rule and is blocked from the third account | Identity ladder, `AccountActivity`, `AuthenticationEvent`; `tests/unit/test_session_scoring.py` |
+| **Probes the merchant** | Assumes the application is sound and the user is the problem | A FLIT agent that walks the merchant's API in staging, continuously, mapped to F3 — a fourth coverage column: *is the merchant exposed* | F3 taxonomy, coverage matrix, the Gh0stAnts and October findings as the first test set |
+| **Shares in real time** | Nightly sync, k-anonymity floor | An actor seen at one merchant is challenged on sight at the next, in minutes | `NetworkReputationRule`, shared identity keys |
+
+And one principle that follows from all four: **enforcement has to be cheaper
+than detection.** Blocking tells the loop which variation failed. Step-ups
+that cost wall-clock time — a delayed reset email, a liveness check on a
+new-device withdrawal, a hold on a first payout to a new address — cost a
+customer a minute and cost an agent its economics.
+
+None of this relaxes the standard that already exists. Every move still has
+to answer: what is the evidence, and can it be traced to a dataset.
+
+---
+
 <p align="center">
   <strong>FLIT — Protecting Money in Motion</strong><br>
   <em>"Flit exists to make preventable fraud impossible."</em>

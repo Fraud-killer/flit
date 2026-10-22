@@ -14,7 +14,7 @@ from django.utils import timezone
 from tests.unit.test_signup_defence import BROWSER, CURL, codes, register
 
 
-SHARED_IP = "203.0.113.77"
+SHARED_IP = "185.199.108.77"
 
 
 def make_application(name, *, contributes=True, consumes=True):
@@ -175,8 +175,8 @@ class TestNetworkSeverity:
         could drive the network.
         """
         alpha = make_application("alpha")
-        quiet_key = key_for("ip", "203.0.113.1")
-        loud_key = key_for("ip", "203.0.113.2")
+        quiet_key = key_for("ip", "185.199.108.1")
+        loud_key = key_for("ip", "185.199.108.2")
 
         report_fraud(make_application("beta"), quiet_key)
         report_fraud(make_application("gamma"), quiet_key)
@@ -267,7 +267,7 @@ class TestNetworkProtectsTheNextMerchant:
         verdicts = {}
 
         for contributors in (2, 4):
-            ip = f"203.0.113.{150 + contributors}"
+            ip = f"185.199.108.{150 + contributors}"
             key = key_for("ip", ip)
 
             for index in range(contributors):
@@ -298,7 +298,7 @@ class TestNetworkProtectsTheNextMerchant:
         result = register(
             application,
             email="unrelated@gmail.com",
-            ip_address="198.51.100.200",
+            ip_address="185.199.109.200",
             user_agent=BROWSER,
             client_id="unrelated_1",
         )

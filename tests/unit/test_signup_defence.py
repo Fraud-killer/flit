@@ -233,7 +233,7 @@ class TestIdentityLadder:
                 application,
                 email=f"pentest.figo+{index}@wearehackerone.com",
                 # Distinct IPs, so only the email root can correlate them.
-                ip_address=f"198.51.100.{index + 1}",
+                ip_address=f"185.199.109.{index + 1}",
                 user_agent=CURL,
                 client_id=f"tagged_{index}",
             )
@@ -252,7 +252,7 @@ class TestIdentityLadder:
             result = register(
                 application,
                 email=f"tuned{index}@gmail.com",
-                ip_address="203.0.113.9",
+                ip_address="185.199.110.9",
                 user_agent=BROWSER,
                 client_id=f"tuned_{index}",
             )

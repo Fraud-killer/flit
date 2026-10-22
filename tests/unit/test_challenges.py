@@ -196,7 +196,7 @@ class TestTurnstile:
 
 
 class TestTheLoopCloses:
-    def key_ids(self, application, value="198.51.100.55"):
+    def key_ids(self, application, value="185.199.109.55"):
         from tests.unit.test_protection_network import key_for
 
         return [key_for("ip", value).id]
@@ -254,7 +254,7 @@ class TestTheLoopCloses:
     ):
         from core.services.network_reputation import NetworkReputation
 
-        ip = "198.51.100.77"
+        ip = "185.199.109.77"
         keys = self.key_ids(application, ip)
 
         NetworkReputation.record(
@@ -277,7 +277,7 @@ class TestTheLoopCloses:
     ):
         from core.services.network_reputation import NetworkReputation
 
-        ip = "198.51.100.88"
+        ip = "185.199.109.88"
         keys = self.key_ids(application, ip)
 
         NetworkReputation.record(

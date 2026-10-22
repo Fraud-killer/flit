@@ -52,6 +52,13 @@ DISPOSABLE_DOMAINS = {
     "harakirimail.com",
     "einrot.com",
     "spambog.com",
+    # Seen on the October 2026 credential attack and the probing before it.
+    "guerrillamailblock.com",
+    "maxxspace.com",
+    "tmpeml.com",
+    "instaddr.win",
+    "powerscrews.com",
+    "noidem.com",
 }
 
 # Reserved by RFC 2606 for documentation and testing. Never a real user.
@@ -76,6 +83,10 @@ DISPOSABLE_MARKERS = (
 ADVERSARIAL_MARKERS = (
     "pentest", "pen-test", "bugbounty", "bug-bounty", "hackerone",
     "bugcrowd", "synack", "intigriti", "xsstest", "sqltest", "redteam",
+    # Names the October 2026 actor gave the accounts and tenants it made
+    # while probing: what it was testing, written down.
+    "prodtest", "kyctest", "backdoor", "ssrfprobe", "ssrf", "massassign",
+    "bypass", "probe",
 )
 
 # Where an epoch could plausibly fall. Anything outside is a coincidence,

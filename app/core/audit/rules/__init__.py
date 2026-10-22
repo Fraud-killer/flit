@@ -47,3 +47,9 @@ from .structuring_rule import StructuringRule as StructuringRule
 from .dormant_awakening_rule import DormantAwakeningRule as DormantAwakeningRule
 from .account_farming_rule import AccountFarmingRule as AccountFarmingRule
 from .mule_network_rule import MuleNetworkRule as MuleNetworkRule
+
+from .reset_to_login_rule import ResetToLoginRule as ResetToLoginRule
+from .automated_credential_action_rule import AutomatedCredentialActionRule as AutomatedCredentialActionRule
+from .credential_reset_storm_rule import CredentialResetStormRule as CredentialResetStormRule
+
+from .session_shape_rule import SessionShapeRule as SessionShapeRule

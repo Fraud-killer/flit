@@ -140,6 +140,23 @@ export class Flit {
     );
   }
 
+  /**
+   * A credential action: `login`, `login_failed`, `password_reset_requested`,
+   * `password_reset_completed`, `password_change`, `email_change`,
+   * `phone_change`, `two_factor_enabled`, `two_factor_disabled` or
+   * `new_device_login`.
+   *
+   * Report the reset request and the login separately, as they happen. The
+   * takeover rules read the interval between them, and an integration that
+   * only reports the login has thrown away the one number that catches it.
+   */
+  auditAuthentication(event) {
+    return this.post(
+      "/api/v1/applications/" + this.applicationId + "/audit-authentication",
+      event,
+    );
+  }
+
   reportOutcome(outcome) {
     return this.post(
       "/api/v1/applications/" + this.applicationId + "/outcomes",

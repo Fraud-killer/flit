@@ -80,6 +80,7 @@ Every detector also declares where it sits on an **evidence ladder** — propose
 - **Velocity Checks** - Detect rapid-fire requests and unusual activity patterns
 - **Impossible Travel Detection** - Flag logins from geographically impossible locations
 - **Account Takeover Prevention** - Multi-signal detection for compromised accounts
+- **Credential Surface Monitoring** - Reset-to-login timing, scripted credential actions, and one origin working many accounts' resets (the October 2026 takeover pattern)
 
 ### Security Infrastructure
 

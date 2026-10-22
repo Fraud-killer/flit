@@ -69,6 +69,12 @@ class Auditor:
         rules.DormantAwakeningRule,
         rules.AccountFarmingRule,
         rules.MuleNetworkRule,
+        # Credential Surface Rules
+        rules.ResetToLoginRule,
+        rules.AutomatedCredentialActionRule,
+        rules.CredentialResetStormRule,
+        # Session Shape
+        rules.SessionShapeRule,
     )
 
     @classmethod
@@ -114,7 +120,11 @@ class Auditor:
 
         rule_names = [rule.__class__.__name__ for rule in active_rules]
 
-        risk_engine = RiskEngine()
+        # The weights this application has learned from its own outcomes,
+        # or the defaults until it has. Same arithmetic the calibrator and
+        # the simulator use, so what they predicted is what this does.
+        from core.calibration import engine_for
+        risk_engine = engine_for(policy)
 
         message_dicts = [
             {

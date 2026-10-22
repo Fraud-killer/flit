@@ -1,0 +1,57 @@
+{
+  "_comment": [
+    "Maps the combined Figo event stream (scripts/flit_export.py in the CNS",
+    "repo) onto FLIT's events. One file carries registrations, credential",
+    "actions and transactions so that they replay in true order and the",
+    "session and takeover rules can see a reset, a login and a payout from",
+    "one origin as one thing. The `event_type` column names the kind per row;",
+    "each kind verifies its own required attributes when it is built.",
+    "",
+    "Labels are per event, not per user: a victim's own logins are legit and",
+    "the attacker's logins on the same account are fraud. The export decides",
+    "from known hostile addresses, forged client addresses, scripted client",
+    "strings, throwaway domains and the window the attacker held an account.",
+    "Replay with --label-delay-days 0: these labels are not chargebacks that",
+    "arrived late, they are what the incident record already knows."
+  ],
+  "event_type_field": "event_type",
+  "fields": {
+    "id": "id",
+    "client_id": "client_id",
+    "type": "type",
+    "status": "status",
+    "amount": "amount",
+    "currency_code": "currency_code",
+    "counterparty_id": "counterparty_id",
+    "chain": "chain",
+    "asset": "asset",
+    "transaction_hash": "transaction_hash",
+    "current_cumulative_balance": "current_cumulative_balance",
+    "counterparty_address": "counterparty_address",
+    "ip_address": "ip_address",
+    "user_agent": "user_agent",
+    "action": "action",
+    "auth_method": "auth_method",
+    "second_factor": "second_factor",
+    "email": "email",
+    "country": "country"
+  },
+  "values": {
+    "type": {
+      "deposit": "credit",
+      "refund": "credit",
+      "swap": "credit",
+      "withdrawal": "debit",
+      "internal_transfer": "debit",
+      "bills": "debit",
+      "bonus": "credit"
+    }
+  },
+  "amount_scale": 0.01,
+  "timestamp_field": "timestamp",
+  "label_field": "label",
+  "labels": {
+    "fraud": "fraud",
+    "legit": "legit"
+  }
+}

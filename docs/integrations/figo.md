@@ -145,6 +145,47 @@ what fills the evidence ledger and what the shared network learns from.
 await failOpen(flit.reportOutcome({ event_id: transaction.id, label: "fraud" }));
 ```
 
+**4. Authentication** — every credential action, as it happens. This is the
+call that did not exist on 20 October 2026, when eighteen accounts were taken
+by requesting a reset and logging in seconds later. The reset flow was
+already rate-limited and attempt-capped; what it could not see was the
+interval, and the interval only exists if both halves are reported.
+
+Hook these handlers in `autospend-core-api`:
+
+| Figo handler | `action` | Notes |
+|---|---|---|
+| `POST /users/forgot-password` | `password_reset_requested` | Report even for an unknown address? No — only when a user matched, or the storm count fills with noise |
+| `POST /users/:email/reset-password` | `password_reset_completed` | After the token check passes |
+| `POST /users/login` | `login` / `login_failed` | After 2FA; pass `second_factor: true` when a code was demanded |
+| `POST /users/login/google`, `login/apple` | `login` with `auth_method` | |
+| `POST /users/disable-2fa` | `two_factor_disabled` | |
+| profile email / phone change | `email_change` / `phone_change` | |
+
+```ts
+const decision = await failOpen(flit.auditAuthentication({
+  id: `${user.id}:login:${Date.now()}`,
+  client_id: user.id,
+  action: "login",                       // see the table above
+  auth_method: "password",               // "google" | "apple" | "token"
+  second_factor: requires2FA,            // was a code demanded and passed?
+  ip_address: req.ip,
+  user_agent: req.headers["user-agent"],
+  visit_token: body.flit_visit_token,
+}));
+
+if (decision.should_block) return reject();      // in enforcing mode only
+if (decision.should_challenge) return stepUp();
+```
+
+Report the reset request *before* sending the email, and the login *after*
+the second factor. `ResetToLoginRule` measures between them;
+`AutomatedCredentialActionRule` reads the client; `CredentialResetStormRule`
+counts accounts per IP. In the replay of the October sequence every takeover
+blocks on its own, the third account onward also carries the storm, and the
+owners who reset slowly from home in the same hour pass untouched
+(`tests/unit/test_credential_takeover.py`).
+
 ### Fail open, always
 
 `failOpen` returns an inert decision — nothing blocked, nothing challenged —
@@ -168,9 +209,17 @@ signups that do not.
 ### Schedule these
 
 ```bash
-python manage.py refresh_sanctions   # daily, alert on failure
-python manage.py expire_challenges   # every few minutes
+python manage.py refresh_sanctions          # daily, alert on failure
+python manage.py expire_challenges          # every few minutes
+python manage.py calibrate --all --apply    # nightly: learn from the month's outcomes
 ```
+
+The last one is the always-on loop. It reads the labels that arrived —
+cases closed, chargebacks and false positives reported — proposes bounded
+weight changes, re-scores the month under each, and applies only what passes
+the guardrails (no more than 1% of good customers blocked, no rise in false
+positives beyond tolerance, no drop in recall). Every run, applied or held,
+lands in `GET /applications/{id}/calibrations`. Review that, not the cases.
 
 ### When to turn enforcement on
 

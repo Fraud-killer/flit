@@ -11,6 +11,7 @@ modes_dict = {
     "client": events.ClientEvent, 
     "transaction": events.TransactionEvent,
     "registration": events.RegistrationEvent,
+    "authentication": events.AuthenticationEvent,
 }
 
 

@@ -51,10 +51,23 @@ EVENT_FIELDS = [
     "wallet_address",
     "counterparty_address",
     "transaction_hash",
+    # Credential and signup surfaces. An export may mix event kinds — a
+    # login, a reset, a registration and a payout from one origin replay in
+    # true order only if they travel in one file — so these are accepted
+    # alongside the money fields and the event kind decides which apply.
+    "action",
+    "auth_method",
+    "second_factor",
+    "email",
+    "phone",
+    "country",
+    "referrer",
 ]
 
 # Columns FLIT can use for device identity when there is no Fingerprint visit.
 DEVICE_FIELDS = ["device_id"]
+
+EVENT_TYPES = ("transaction", "authentication", "registration")
 
 
 class MappingError(Exception):
@@ -70,14 +83,37 @@ class EventMapping:
         self.label_field = configuration.get("label_field")
         self.amount_scale = configuration.get("amount_scale", 1)
         self.timestamp_field = configuration.get("timestamp_field", "timestamp")
+        # Either one kind for the whole file (`event_type`), or a column
+        # naming the kind per row (`event_type_field`). Transaction when
+        # neither is given, so every existing mapping replays as before.
+        self.event_type = configuration.get("event_type", "transaction")
+        self.event_type_field = configuration.get("event_type_field")
+
+        if self.event_type not in EVENT_TYPES:
+            raise MappingError(f"event_type must be one of {EVENT_TYPES}")
 
         unknown = set(self.fields) - set(EVENT_FIELDS) - set(DEVICE_FIELDS)
         if unknown:
             raise MappingError(f"Unknown event fields in mapping: {sorted(unknown)}")
 
-        for required in ("id", "type", "client_id"):
-            if required not in self.fields and required not in self.constants:
-                raise MappingError(f"Mapping must provide {required!r}")
+        required = ("id", "type", "client_id")
+        if self.event_type_field or self.event_type != "transaction":
+            # Each event kind verifies its own required attributes when it
+            # is built; only the identifier is required of every row.
+            required = ("id",)
+
+        for name in required:
+            if name not in self.fields and name not in self.constants:
+                raise MappingError(f"Mapping must provide {name!r}")
+
+    def event_type_for(self, row):
+        if not self.event_type_field:
+            return self.event_type
+
+        kind = row.get(self.event_type_field) or self.event_type
+        if kind not in EVENT_TYPES:
+            raise MappingError(f"Unknown event type {kind!r} in column {self.event_type_field!r}")
+        return kind
 
     @classmethod
     def load(cls, path):
@@ -103,6 +139,7 @@ class EventMapping:
             device_id=device_id,
             timestamp=self.timestamp(row),
             label=self.label(row),
+            event_type=self.event_type_for(row),
         )
 
     def translate(self, field, value):
@@ -116,6 +153,10 @@ class EventMapping:
 
         if field == "account_age_days":
             return int(float(value))
+
+        if field == "second_factor" and isinstance(value, str):
+            # CSV carries booleans as text.
+            return value.strip().lower() in ("true", "t", "1", "yes")
 
         return value
 

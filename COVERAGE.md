@@ -22,8 +22,8 @@ Of the 19 covered techniques, **1** rest on a detector with measured precision a
 
 | Rung | Detectors | What it requires |
 |---|---|---|
-| Proposed | 13 | Reasoned from how the fraud works. No evidence yet. |
-| Synthetic-tested | 27 | Fires on a constructed example of the technique and stays quiet on a constructed legitimate lookalike. |
+| Proposed | 12 | Reasoned from how the fraud works. No evidence yet. |
+| Synthetic-tested | 32 | Fires on a constructed example of the technique and stays quiet on a constructed legitimate lookalike. |
 | Historically backtested | 1 | Run against a merchant's labelled history, with measured precision and recall at the shipped threshold. |
 | Shadow-validated | 0 | Run against live traffic without acting on it, and reviewed. |
 | Production-observed | 0 | Acting in production, with its decisions labelled by reviewers. |
@@ -36,9 +36,9 @@ Of the 19 covered techniques, **1** rest on a detector with measured precision a
 | F3 | Technique | Tactic | Evidence | Detectors |
 |---|---|---|---|---|
 | `F1001` | 3DS Bypass | Stealth | Synthetic-tested | ThreeDSTimeoutRule |
-| `F1002` | Abuse of Public-Facing API | Positioning, Initial Access, Execution | Synthetic-tested | BotSignalRule, ExpectedSignalRule |
+| `F1002` | Abuse of Public-Facing API | Positioning, Initial Access, Execution | Synthetic-tested | AutomatedCredentialActionRule, BotSignalRule, ExpectedSignalRule, SessionShapeRule |
 | `F1005` | Account Manipulation | Positioning, Defense Impairment | Synthetic-tested | AccountTakeoverRule, NewWithdrawalAddressRule |
-| `F1006` | Account Takeover | Initial Access | Synthetic-tested | AccountSharingRule, AccountTakeoverRule, DeviceExpiredRule, NewDeviceCountryRule, UnregisteredDeviceRule |
+| `F1006` | Account Takeover | Initial Access | Synthetic-tested | AccountSharingRule, AccountTakeoverRule, AutomatedCredentialActionRule, DeviceExpiredRule, NewDeviceCountryRule, ResetToLoginRule, SessionShapeRule, UnregisteredDeviceRule |
 | `F1012` | Card Testing | Positioning | Synthetic-tested | CardTestingRule, IssuerSignalRule, RetryAttackRule |
 | `F1016` | Compromise Payment Gateway | Initial Access | Synthetic-tested | GatewayPatternRule |
 | `F1018` | Convert to Cryptocurrency | Monetization | Synthetic-tested | CryptoCashOutRule |
@@ -53,7 +53,7 @@ Of the 19 covered techniques, **1** rest on a detector with measured precision a
 | `F1047` | Transfer of funds | Monetization | Synthetic-tested | CollectionWalletRule, MuleNetworkRule, PassThroughRule |
 | `T1110` | Brute Force | Initial Access | Proposed | VelocityCheckRule |
 | `T1583` | Acquire Infrastructure | Resource Development | Synthetic-tested | DomainReputationRule, FreshFundingWalletRule, IPConcentrationRule, IPReputationRule |
-| `T1585` | Establish Accounts | Resource Development | Synthetic-tested | AccountFarmingRule, AccountSharingRule, DisposableEmailRule, DomainReputationRule, EmailPatternRule, FreshFundingWalletRule, MultiAccountingRule |
+| `T1585` | Establish Accounts | Resource Development | Synthetic-tested | AccountFarmingRule, AccountSharingRule, DisposableEmailRule, DomainReputationRule, EmailPatternRule, FreshFundingWalletRule, MultiAccountingRule, SessionShapeRule |
 
 ## Addressable, not yet covered
 
@@ -130,12 +130,14 @@ These happen where a server-side decision layer has no eyes. They are listed so 
 |---|---|---|---|---|
 | AccountFarmingRule | detection | `T1585` | Synthetic-tested | tests/unit/test_mule_detection.py::TestAccountFarmingRule; tests/unit/test_signup_defence.py::TestIdentityLadder |
 | AccountSharingRule | detection | `F1006`, `T1585` | Synthetic-tested | tests/unit/test_device_graph.py::TestAccountSharingRule |
-| AccountTakeoverRule | detection | `F1006`, `F1005` | Proposed | — |
+| AccountTakeoverRule | detection | `F1006`, `F1005` | Synthetic-tested | tests/unit/test_credential_takeover.py::TestOctober2026Replay |
 | AmlCftLimitExceededRule | control | — | Proposed | — |
+| AutomatedCredentialActionRule | detection | `F1002`, `F1006` | Synthetic-tested | tests/unit/test_credential_takeover.py::TestOctober2026Replay |
 | BotSignalRule | detection | `F1002` | Synthetic-tested | tests/unit/test_intelligence.py::TestBotSignalRule |
 | CardTestingRule | detection | `F1012` | Proposed | — |
 | ChallengeEvasionRule | corroboration | — | Synthetic-tested | tests/unit/test_challenges.py::TestTheLoopCloses |
 | CollectionWalletRule | detection | `F1047` | Synthetic-tested | tests/unit/test_crypto.py::TestCollectionWallet |
+| CredentialResetStormRule | detection | `T1110.004`, `F1006.003` | Synthetic-tested | tests/unit/test_credential_takeover.py::TestOctober2026Replay |
 | CryptoCashOutRule | detection | `F1018` | Synthetic-tested | tests/unit/test_crypto.py::TestCryptoCashOut |
 | DeviceConsistencyRule | detection | `F1023` | Synthetic-tested | tests/unit/test_device_collection.py::TestConsistencyChecks |
 | DeviceExpiredRule | detection | `F1006` | Proposed | — |
@@ -163,8 +165,10 @@ These happen where a server-side decision layer has no eyes. They are listed so 
 | NewWithdrawalAddressRule | detection | `F1005` | Synthetic-tested | tests/unit/test_crypto.py::TestNewWithdrawalAddress |
 | PassThroughRule | detection | `F1047`, `F1025` | Synthetic-tested | tests/unit/test_mule_detection.py::TestPassThroughRule |
 | PaymentFraudRule | detection | `F1028` | Synthetic-tested | tests/unit/test_fraud_rules.py::TestPaymentFraudRule |
+| ResetToLoginRule | detection | `F1006.003`, `F1006` | Synthetic-tested | tests/unit/test_credential_takeover.py::TestOctober2026Replay |
 | RetryAttackRule | detection | `F1012` | Proposed | — |
 | SanctionedAddressRule | control | — | Synthetic-tested | tests/unit/test_sanctions.py::TestSanctionedAddressRule |
+| SessionShapeRule | detection | `F1002`, `F1006`, `T1585` | Synthetic-tested | tests/unit/test_session_scoring.py::TestEvasiveReplay |
 | StructuringRule | detection | `F1045` | Historically backtested | Replayed against 11,868 labelled Figo transactions (2026-02-01 to 2026-09-19, 235 fraud / 11,408 legit): fired 56 times, 12 on fraud, lift 13.1, precision 0.214. The only rule in FLIT with measured lift above 1 on that portfolio. Also tests/unit/test_mule_detection.py::TestStructuringRule. |
 | ThreeDSTimeoutRule | detection | `F1001`, `F1039` | Synthetic-tested | tests/unit/test_fraud_rules.py::TestThreeDSTimeoutRule |
 | UnregisteredDeviceRule | detection | `F1006` | Proposed | — |

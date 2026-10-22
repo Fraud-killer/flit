@@ -3,7 +3,7 @@ from asgiref.sync import sync_to_async
 from devkit.checks import is_present
 
 from core.audit.logger import AuditLogger
-from core.audit.events import ClientEvent, TransactionEvent
+from core.audit.events import ClientEvent, TransactionEvent, AuthenticationEvent, RegistrationEvent
 from core.audit.models import AuditLogCategory, AuditLogLevel
 
 
@@ -72,7 +72,7 @@ class AuditRecorder:
             action=cls.action(event),
             actor_type="client",
             actor_id=event.account_id,
-            resource_type="transaction" if isinstance(event, TransactionEvent) else "client_event",
+            resource_type=cls.resource_type(event),
             resource_id=cls.value(event, "id"),
             application_id=application.id,
             organization_id=getattr(application, "organization_id", None),
@@ -85,6 +85,12 @@ class AuditRecorder:
             context=dict(
                 visit_id=cls.value(event, "visit_id"),
                 device_id=str(identity.id) if identity else None,
+                # Credential actions: what was done and how the credential
+                # was presented, so the takeover rules can read the sequence
+                # back without re-parsing the event.
+                action=cls.value(event, "action"),
+                auth_method=cls.value(event, "auth_method"),
+                second_factor=cls.value(event, "second_factor"),
                 amount=cls.value(event, "amount"),
                 currency_code=cls.value(event, "currency_code"),
                 transaction_type=cls.value(event, "type"),
@@ -149,18 +155,35 @@ class AuditRecorder:
 
     @classmethod
     def category(cls, event):
-        if isinstance(event, ClientEvent):
+        if isinstance(event, (ClientEvent, AuthenticationEvent)):
             return AuditLogCategory.AUTHENTICATION
         return AuditLogCategory.TRANSACTION
 
     @classmethod
+    def resource_type(cls, event):
+        if isinstance(event, TransactionEvent):
+            return "transaction"
+        if isinstance(event, AuthenticationEvent):
+            return "authentication"
+        return "client_event"
+
+    @classmethod
     def action(cls, event):
+        if isinstance(event, AuthenticationEvent):
+            return cls.value(event, "action")
         if isinstance(event, ClientEvent):
             return cls.value(event, "action") or "client_event"
+        if isinstance(event, RegistrationEvent):
+            # Recorded by name so a session can tell the accounts an origin
+            # created from the ones it merely touched.
+            return cls.value(event, "action") or "registration"
         return f"transaction_{cls.value(event, 'type') or 'unknown'}"
 
     @staticmethod
     def outcome(event):
+        if isinstance(event, AuthenticationEvent):
+            return "success" if event.succeeded else "failure"
+
         status = str(event.extra.get("status", "")).lower()
         if status in SUCCESS_STATUSES:
             return "success"

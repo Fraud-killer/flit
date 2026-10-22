@@ -26,7 +26,7 @@ from django.utils import timezone
 from core.models import AuditLog, DeviceIdentity
 from core.models.device_identity import DeviceIdentitySource
 from core.audit.auditor import Auditor
-from core.audit.events import TransactionEvent
+from core.audit.events import TransactionEvent, AuthenticationEvent, RegistrationEvent
 from core.backtest.mapping import MappingError
 
 
@@ -85,8 +85,15 @@ class Replay:
 
         return prepared
 
+    EVENT_CLASSES = dict(
+        transaction=TransactionEvent,
+        authentication=AuthenticationEvent,
+        registration=RegistrationEvent,
+    )
+
     def replay_one(self, item):
-        event = TransactionEvent(**item.attributes)
+        event_class = self.EVENT_CLASSES[getattr(item, "event_type", None) or "transaction"]
+        event = event_class(**item.attributes)
 
         with frozen_time(item.timestamp):
             errors = event.verify(self.application.policy)

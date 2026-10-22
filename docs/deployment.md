@@ -45,12 +45,22 @@ rather than a 301.
 
 ## Scheduled jobs
 
-Two matter, as separate Railway cron services:
+Three matter, as separate Railway cron services:
 
 ```bash
-python manage.py refresh_sanctions    # daily — alert on failure
-python manage.py expire_challenges    # every few minutes
+python manage.py refresh_sanctions          # daily — alert on failure
+python manage.py expire_challenges          # every few minutes
+python manage.py calibrate --all --apply    # nightly — learn from outcomes
 ```
+
+`calibrate` is the loop that moves weights from the labels that arrived. It
+is safe to schedule with `--apply` because of its guardrails: a bounded step
+per weight, a minimum labelled sample, and a re-score of the month under
+every proposal that rejects anything blocking more good customers or
+catching less fraud. It never changes a detector's evidence claim; it says
+which rules have earned one. Every run is a `CalibrationRun` row, so the
+review is `GET /applications/{id}/calibrations`, and a held run with its
+reason is as much the point as an applied one.
 
 A sanctions list that quietly stopped refreshing is worse than no list, so
 FLIT reports an unloaded or stale list on the decision itself. Alert on the

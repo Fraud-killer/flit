@@ -163,13 +163,25 @@ class TestIPRangeSet:
 
 
 class TestIPIntelligence:
-    def test_private_and_reserved_ips_are_skipped(self, no_geoip):
+    def test_private_and_reserved_ips_are_implausible_not_skipped(self, no_geoip):
+        """
+        An end user never arrives from loopback, a private range, a
+        documentation range or a public resolver. On an internet-facing API
+        such an address means the caller wrote the forwarded header — which
+        is the finding, and it pre-empts every other lookup.
+        """
         from core.intelligence.ip_intelligence import IPIntelligence
 
         IPIntelligence.TOR_EXIT_NODES.store(["10.0.0.1"])
         info = analyze("10.0.0.1")
+        assert info.is_implausible
         assert not info.is_tor
-        assert info.risk_score == 0
+        assert info.risk_factors == ["implausible_client_ip"]
+
+        for forged in ("127.137.71.187", "203.0.113.9", "8.8.8.8", "9.9.9.9"):
+            assert analyze(forged).is_implausible, forged
+
+        assert not analyze(CLEAN_IP).is_implausible
         assert IPIntelligence._is_private_ip("not-an-ip")
 
     def test_flags_tor_exit_node_from_shared_list(self, no_geoip):

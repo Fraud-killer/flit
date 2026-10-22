@@ -18,6 +18,7 @@ from api.parsers import parse_account_lookup_inputs
 from core.services.simulate_policy import SimulatePolicy
 from api.parsers import parse_decision_filters, parse_case_inputs, parse_simulation_inputs
 from api.parsers import parse_challenge_inputs, parse_challenge_verification
+from api.parsers import parse_calibration_inputs
 from api.serializers.case_serializers import serialize_case
 from api.serializers.challenge_serializers import serialize_challenge
 from core.services.publish_outcome import PublishOutcome
@@ -253,6 +254,39 @@ class ApplicationViewSet(ViewSet):
             CaseNote.objects.create(case=case, body=inputs.note, author=reviewer)
 
         return build_api_response(data=dict(case=serialize_case(case)))
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.GET, HTTPMethod.POST],
+        url_path=r"calibrations",
+    )
+    def calibrations(self, request, pk):
+        """
+        GET: the review queue — every calibration run, newest first, with
+        what it proposed, accepted, rejected and why.
+        POST: run the calibrator now. A dry run unless the body carries
+        `apply: true`, and even then only proposals that pass the guardrails
+        are written.
+        """
+        from core.models import CalibrationRun
+        from core.calibration import Calibrator, serialize_run
+
+        inputs, errors = parse_calibration_inputs(pk, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        if request.method == HTTPMethod.GET:
+            runs = CalibrationRun.objects.filter(application=inputs.application)[:20]
+            return build_api_response(data=dict(
+                calibration=inputs.application.policy.calibration or {},
+                runs=[serialize_run(run) for run in runs],
+            ))
+
+        run = Calibrator.run(
+            application=inputs.application, days=inputs.days, apply=inputs.apply,
+        )
+        return build_api_response(data=serialize_run(run))
 
     @action(
         detail=True,

@@ -46,6 +46,12 @@ class IPReputationRule(BaseRule):
 
         checks = [
             (
+                "implausible_client_ip",
+                info.is_implausible, False,
+                "Client address cannot be an end user's (reserved range, loopback "
+                "or public resolver): the forwarded header is caller-controlled",
+            ),
+            (
                 "tor_exit_node",
                 info.is_tor, visit_flag("tor"),
                 "IP address is a Tor exit node",

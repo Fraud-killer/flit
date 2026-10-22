@@ -257,7 +257,7 @@ class TestCardTestingRule:
             codes(run_rule(CardTestingRule, make_event(
                 amount=1,
                 status="success",
-                ip_address="203.0.113.7",
+                ip_address="185.199.110.7",
                 card_fingerprint=f"card_{n}",
             )))
             for n in range(3)
@@ -272,7 +272,7 @@ class TestCardTestingRule:
             messages = run_rule(CardTestingRule, make_event(
                 amount=400,
                 status="success",
-                ip_address="203.0.113.7",
+                ip_address="185.199.110.7",
                 card_fingerprint=f"card_{n}",
             ))
             assert "card_testing_multiple_small_transactions" not in codes(messages)
@@ -284,7 +284,7 @@ class TestIPConcentrationRule:
 
         results = [
             codes(run_rule(IPConcentrationRule, make_event(
-                ip_address="203.0.113.9",
+                ip_address="185.199.110.9",
                 client_id=f"customer_{n}",
             )))
             for n in range(6)

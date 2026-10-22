@@ -2,7 +2,7 @@ import math
 from datetime import timedelta
 from django.utils import timezone
 from devkit.message import Message
-from core.audit.events import TransactionEvent
+from core.audit.events import TransactionEvent, AuthenticationEvent
 from core.audit.rules.base_rule import BaseRule
 from core.audit.lock_cache import lockcache, LockCache
 from .base_rule import Maturity, RuleKind
@@ -167,14 +167,33 @@ class ImpossibleTravelRule(BaseRule, LockCache):
 
 
 class AccountTakeoverRule(BaseRule, LockCache):
+    """
+    Money moving, or the account being re-tied, shortly after its
+    credentials were recovered or replaced.
+
+    Reads the account's last day of credential history — resets, password,
+    email and phone changes, a second factor coming off, logins that scored
+    badly — and fires when enough of it has piled up behind a debit or a
+    manipulation. Each signal on its own is a thing an owner does; the sum,
+    in a day, before a withdrawal, is what a takeover looks like.
+    """
 
     techniques = ("F1006", "F1005")
     kind = RuleKind.DETECTION
-    maturity = Maturity.PROPOSED
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_credential_takeover.py::TestOctober2026Replay"
+
+    # A login recorded at or above this score counts as a hostile login.
+    RISKY_LOGIN_SCORE = 0.5
 
     @property
     def applies(self):
-        return isinstance(self.event, TransactionEvent)
+        if isinstance(self.event, TransactionEvent):
+            return True
+        return (
+            isinstance(self.event, AuthenticationEvent)
+            and self.event.is_manipulation
+        )
 
     @lockcache(key="account_signals")
     async def get_account_signals(self):
@@ -196,10 +215,19 @@ class AccountTakeoverRule(BaseRule, LockCache):
             )
 
             signals = {
+                "password_resets": recent_logs.filter(
+                    action__in=list(AuthenticationEvent.RESET_ACTIONS),
+                ).count(),
                 "password_changes": recent_logs.filter(action="password_change").count(),
                 "email_changes": recent_logs.filter(action="email_change").count(),
                 "phone_changes": recent_logs.filter(action="phone_change").count(),
+                "two_factor_disabled": recent_logs.filter(action="two_factor_disabled").count(),
                 "new_device_logins": recent_logs.filter(action="new_device_login").count(),
+                "risky_logins": recent_logs.filter(
+                    category=AuditLogCategory.AUTHENTICATION,
+                    action="login",
+                    risk_score__gte=self.RISKY_LOGIN_SCORE,
+                ).count(),
                 "failed_logins": recent_logs.filter(
                     category=AuditLogCategory.AUTHENTICATION,
                     outcome="failure",
@@ -223,17 +251,36 @@ class AccountTakeoverRule(BaseRule, LockCache):
         messages = []
         risk_indicators = 0
 
+        # A recovered credential is the strongest single signal: it is how
+        # every takeover in the October replay began.
+        if signals["password_resets"] > 0:
+            risk_indicators += 2
+
         if signals["password_changes"] > 0:
             risk_indicators += 2
 
         if signals["email_changes"] > 0:
             risk_indicators += 2
 
+        if signals["phone_changes"] > 0:
+            risk_indicators += 1
+
+        if signals["two_factor_disabled"] > 0:
+            risk_indicators += 2
+
         if signals["new_device_logins"] > 0:
+            risk_indicators += 1
+
+        if signals["risky_logins"] > 0:
             risk_indicators += 1
 
         if signals["failed_logins"] >= 3:
             risk_indicators += 1
+
+        # The event being judged is not in the history yet. A manipulation
+        # happening now counts the same as one that happened an hour ago.
+        if isinstance(self.event, AuthenticationEvent) and self.event.is_manipulation:
+            risk_indicators += 2
 
         is_high_value = getattr(self.event, "is_high_value", False)
         if is_high_value:

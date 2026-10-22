@@ -25,6 +25,10 @@ class RiskWeights:
     proxy_detected: float = 0.5
     vpn_detected: float = 0.4
     datacenter_ip: float = 0.3
+    # A client address no end user can have. Not a risk signal about the
+    # actor's location but proof the actor is writing the headers, which is
+    # worth more than any location would be.
+    implausible_client_ip: float = 0.9
     high_risk_country: float = 0.5
     bot_detected: float = 0.7
     multi_accounting: float = 0.7
@@ -90,6 +94,22 @@ class RiskWeights:
     # not turned away, until more than the minimum of it agrees.
     network_fraud_history: float = 0.7
     challenge_evasion: float = 0.7
+    # Credential surface. A reset that turns into a login faster than a
+    # person reads an email is the takeover itself, not a hint of one, so it
+    # is weighted to decide on its own.
+    reset_then_login: float = 0.9
+    # A script performing a credential action. Weighted below the interval
+    # because a merchant's own integration test looks exactly like this.
+    automated_credential_action: float = 0.8
+    # One origin working through many accounts' credentials.
+    credential_reset_storm: float = 0.85
+    # Session shape. The whole session reads as automated: rotating clients,
+    # machine cadence, accounts it did not create, the motif repeating. The
+    # signal a fixed per-event threshold cannot be stepped over.
+    machine_session: float = 0.85
+    # The takeover motif — reset, login, then money or manipulation — seen
+    # on two or more accounts from one origin. That is the attack itself.
+    campaign_motif: float = 0.95
     # Data completeness, not evidence of fraud: reported, never scored.
     req_event_attrs: float = 0.0
 
@@ -99,7 +119,11 @@ class RiskWeights:
 
     category_multipliers: Dict[str, float] = field(default_factory=lambda: {
         "transaction": 1.0,
-        "authentication": 0.8,
+        # A credential action is where a takeover happens, not a hint that
+        # one might. Discounting it put a measured thirty-second
+        # reset-to-login from a scripted client on a hosting provider under
+        # the block line, so it is not discounted.
+        "authentication": 1.0,
         "device": 0.7,
         "account": 0.9,
         # Registration abuse is the thing this category exists to catch, so
@@ -156,6 +180,7 @@ class RiskWeights:
             "proxy_detected": self.proxy_detected,
             "vpn_detected": self.vpn_detected,
             "datacenter_ip": self.datacenter_ip,
+            "implausible_client_ip": self.implausible_client_ip,
             "high_risk_country": self.high_risk_country,
             "multi_accounting": self.multi_accounting,
             "account_sharing": self.account_sharing,
@@ -199,6 +224,11 @@ class RiskWeights:
             "sanctions_list_stale": self.sanctions_list_stale,
             "network_fraud_history": self.network_fraud_history,
             "challenge_evasion": self.challenge_evasion,
+            "reset_then_login": self.reset_then_login,
+            "automated_credential_action": self.automated_credential_action,
+            "credential_reset_storm": self.credential_reset_storm,
+            "machine_session": self.machine_session,
+            "campaign_motif": self.campaign_motif,
             "req_event_attrs": self.req_event_attrs,
         }
         if rule_code in weight_map:

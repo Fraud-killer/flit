@@ -21,5 +21,8 @@ from .case import Case as Case
 from .case import CaseNote as CaseNote
 from .case import CaseStatus as CaseStatus
 
+from .calibration import CalibrationRun as CalibrationRun
+from .calibration import CalibrationMode as CalibrationMode
+
 from core.audit.models import AuditLog as AuditLog
 from core.audit.models import AuditLogArchive as AuditLogArchive

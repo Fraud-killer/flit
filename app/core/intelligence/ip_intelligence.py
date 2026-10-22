@@ -24,6 +24,12 @@ class IPRiskInfo:
     is_datacenter: bool = False
     is_bot: bool = False
     is_known_attacker: bool = False
+    # The address cannot belong to an end user at all — a reserved or
+    # documentation range, loopback, or a well-known public resolver. On an
+    # internet-facing API that means the client chose it: the forwarded
+    # header is caller-controlled, and every IP signal on this request is
+    # the attacker's choice.
+    is_implausible: bool = False
     risk_score: float = 0.0
     country_code: Optional[str] = None
     asn: Optional[str] = None
@@ -40,6 +46,7 @@ class IPRiskInfo:
             "is_datacenter": self.is_datacenter,
             "is_bot": self.is_bot,
             "is_known_attacker": self.is_known_attacker,
+            "is_implausible": self.is_implausible,
             "risk_score": self.risk_score,
             "country_code": self.country_code,
             "asn": self.asn,
@@ -215,6 +222,12 @@ class IPIntelligence:
         "AS20473",  # Vultr
         "AS46606",  # Unified Layer
         "AS36352",  # ColoCrossing
+        # Hosts the October 2026 credential attack came from. Small VPS
+        # providers whose names do not contain a cloud keyword.
+        "AS48753",  # AVA HOST / AlexHost (Moldova)
+        "AS906",    # DMIT Cloud Services
+        "AS9009",   # M247
+        "AS47583",  # Hostinger
     }
 
     # Coarse cloud ranges, used only when no GeoIP ASN data is available.
@@ -234,6 +247,9 @@ class IPIntelligence:
         "linode", "vultr", "ovh", "hetzner", "cloudflare", "oracle cloud",
         "alibaba", "tencent", "hosting", "datacenter", "data center",
         "server", "vps", "cloud", "colocation",
+        # "host" alone would match too many ISPs; these are the exact VPS
+        # brands seen on credential attacks.
+        "alexhost", "ava host", "hostinger", "m247", "dmit",
     ]
 
     VPN_ISP_KEYWORDS = [
@@ -243,6 +259,18 @@ class IPIntelligence:
     ]
 
     HIGH_RISK_COUNTRIES = {"KP", "IR", "SY", "CU", "RU", "BY"}
+
+    # Public DNS resolvers. Globally routable, so `is_global` passes them,
+    # but no browser ever connects from one. Seen as "client" addresses on
+    # the October 2026 attack, forged through a forwarded header.
+    PUBLIC_RESOLVERS = {
+        "8.8.8.8", "8.8.4.4",                      # Google
+        "1.1.1.1", "1.0.0.1",                      # Cloudflare
+        "9.9.9.9", "149.112.112.112",              # Quad9
+        "208.67.222.222", "208.67.220.220",        # OpenDNS
+        "2001:4860:4860::8888", "2001:4860:4860::8844",
+        "2606:4700:4700::1111", "2606:4700:4700::1001",
+    }
 
     TOR_EXIT_NODES = SharedIPList("tor_exit_nodes")
     THREAT_LIST = SharedIPList("threat_list")
@@ -274,7 +302,13 @@ class IPIntelligence:
         info = IPRiskInfo(ip_address=ip_address)
         risk_factors = []
 
-        if cls._is_private_ip(ip_address):
+        if cls._is_private_ip(ip_address) or ip_address in cls.PUBLIC_RESOLVERS:
+            # Nothing else can be learned about an address like this, and
+            # nothing else needs to be: no end user arrives from loopback, a
+            # documentation range or Google's resolver. The caller wrote it.
+            info.is_implausible = True
+            info.risk_score = 0.9
+            info.risk_factors = ["implausible_client_ip"]
             return info
 
         if ip_address in cls.TOR_EXIT_NODES:

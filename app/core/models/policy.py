@@ -30,6 +30,13 @@ class Policy(models.Model):
     identity_thresholds = models.JSONField(default=get_device_thresholds_default, blank=True)
     # Overrides for core.audit.rules.crypto_thresholds.DEFAULT_CRYPTO_THRESHOLDS
     crypto_thresholds = models.JSONField(default=get_device_thresholds_default, blank=True)
+    # What the calibrator has learned from this application's outcomes:
+    # `weights` (per-code overrides on core.scoring.DEFAULT_WEIGHTS),
+    # `thresholds` (block_at / review_at), `calibrated_at` and the `run_id`
+    # that wrote them. Read at decision time by core.calibration.engine_for.
+    # Written only by a CalibrationRun that passed its guardrails, so every
+    # value here can be traced to the run and the labelled rows behind it.
+    calibration = models.JSONField(default=dict, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
