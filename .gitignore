@@ -47,8 +47,6 @@ coverage.xml
 *.cover
 
 # Environments
-.env
-.env.local
 .env.*.local
 *.env
 
@@ -90,3 +88,5 @@ Skypay records/
 # The evidence ledger is what a measured maturity claim rests on, and the
 # test suite rejects such a claim without it.
 !evidence.json
+config.bat
+node_modules
