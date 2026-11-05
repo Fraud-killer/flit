@@ -305,6 +305,21 @@ curl -X POST http://localhost:18000/api/v1/applications/{app_id}/outcomes \
 
 Labels: `fraud`, `chargeback`, `legit`, `false_positive`. Send `event_id` (your transaction id) instead of `audit_id` to label that event's most recent audit.
 
+**Say what it cost.** Add `amount` and `currency_code` to report the loss as you measured it — after a partial recovery, say. Without them the transaction's own amount stands in. The amount is what the loss ledger and the calibrator add up; a label with no amount from either source is counted but never summed, so the money FLIT reports is a floor, not a guess.
+
+### The Loss Ledger
+
+FLIT exists to prevent money loss, so it keeps the number:
+
+```bash
+curl "http://localhost:18000/api/v1/applications/{app_id}/loss?days=30" \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}"
+```
+
+Per currency, from the outcomes you reported: `prevented` (fraud FLIT blocked while enforcing), `in_shadow` (fraud it would have blocked while not yet acting), `flagged` (fraud sent to review or challenge), `leaked` (fraud it allowed), `friction` (good customers it blocked), `net` (prevented minus friction) and `leak_rate`. Currencies are never converted or added together, and `counts.unpriced` says how many labelled decisions carried no amount. `python manage.py loss_report --application NAME` prints the same ledger.
+
+The calibrator reads the same money. Beside the rate and recall guardrails, a weight change may not raise the money lost or turned away — one more false positive within the rate tolerance can be a wire, not a coffee — and every calibration run reports `loss` before and after in the application's currency.
+
 ### Review Decisions
 
 Every decision is queryable, and anything that comes back for review opens a **case**.

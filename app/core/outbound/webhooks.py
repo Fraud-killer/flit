@@ -48,6 +48,9 @@ EVENTS = (
     "challenge.failed",
     "calibration.applied",
     "policy.loosened",
+    "investigation.completed",
+    "agent.approval_requested",
+    "monitor.fired",
 )
 
 TIMEOUT_SECONDS = 10

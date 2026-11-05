@@ -126,6 +126,10 @@ class AuditRecorder:
             factors=audit_log.risk_factors,
         ))
 
+        # Agent FLIT, if this application asked it to read its cases.
+        from core.agent.loop import Investigations
+        Investigations.on_case_opened(case)
+
         return case
 
     @classmethod

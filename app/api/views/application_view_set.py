@@ -21,6 +21,8 @@ from api.parsers import parse_decision_filters, parse_case_inputs, parse_simulat
 from api.parsers import parse_challenge_inputs, parse_challenge_verification
 from api.parsers import parse_calibration_inputs
 from api.parsers import parse_policy_inputs
+from api.parsers import parse_loss_inputs
+from core.loss import Loss, LossReport
 from core.messages.policies import msg_policy_loosening
 from api.serializers.case_serializers import serialize_case
 from api.serializers.challenge_serializers import serialize_challenge
@@ -89,7 +91,15 @@ class ApplicationViewSet(ViewSet):
         audit_log = inputs.audit_log
         audit_log.label = inputs.label
         audit_log.labeled_at = timezone.now()
-        audit_log.save(update_fields=["label", "labeled_at"])
+        # The money behind the label: what the merchant reports, or the
+        # transaction's own amount. Stored so the ledger never has to
+        # re-derive it from a context that may have been capped.
+        if inputs.amount is not None:
+            audit_log.loss_amount = inputs.amount
+            audit_log.loss_currency = inputs.currency_code
+        else:
+            audit_log.loss_amount, audit_log.loss_currency = Loss.at_stake(audit_log)
+        audit_log.save(update_fields=["label", "labeled_at", "loss_amount", "loss_currency"])
 
         # A reported outcome is ground truth. Publishing it is what lets the
         # rest of the network learn from this merchant's experience.
@@ -101,7 +111,29 @@ class ApplicationViewSet(ViewSet):
                 event_id=audit_log.resource_id,
                 label=audit_log.label,
                 labeled_at=audit_log.labeled_at,
+                amount=None if audit_log.loss_amount is None else float(audit_log.loss_amount),
+                currency_code=audit_log.loss_currency,
             )
+        )
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.GET],
+        url_path=r"loss",
+    )
+    def loss(self, request, pk):
+        """
+        The loss ledger: what FLIT's decisions did to this merchant's money
+        over the window, per currency — prevented, leaked, flagged, turned
+        away — from the outcomes the merchant reported.
+        """
+        inputs, errors = parse_loss_inputs(pk, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        return build_api_response(
+            data=LossReport.call(application=inputs.application, days=inputs.days)
         )
 
     @action(

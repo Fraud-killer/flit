@@ -15,6 +15,7 @@ ledger, which is what lets the rule claim the rung.
 
 import json
 from collections import defaultdict
+from decimal import Decimal
 from datetime import timedelta
 
 from django.core.management.base import BaseCommand, CommandError
@@ -23,6 +24,21 @@ from django.utils import timezone
 from core.audit.models import AuditLogLabel
 from core.models import Application, AuditLog
 from core.taxonomy import evidence
+
+
+from core.loss import Loss, to_amount, is_currency_code
+
+
+def amount_of(row):
+    """(amount, currency) of a report row: the reported loss, else the transaction's."""
+    if row.get("loss_amount") is not None:
+        return row["loss_amount"], row.get("loss_currency")
+    context = row.get("context") or {}
+    amount = to_amount(context.get("amount"))
+    currency = context.get("currency_code")
+    if amount is None or not is_currency_code(currency or ""):
+        return None, None
+    return amount, currency
 
 
 FRAUD = {AuditLogLabel.FRAUD, AuditLogLabel.CHARGEBACK}
@@ -52,7 +68,7 @@ class Command(BaseCommand):
         rows = list(
             AuditLog.objects
             .filter(application_id=application.id, timestamp__gte=since)
-            .values("context", "label", "risk_score")
+            .values("context", "label", "risk_score", "loss_amount", "loss_currency")
         )
 
         report = self.measure(rows, application, options["days"])
@@ -86,11 +102,22 @@ class Command(BaseCommand):
         fraud = [row for row in rows if row["label"] in FRAUD]
         legit = [row for row in rows if row["label"] in LEGIT]
 
-        per_code = defaultdict(lambda: dict(fired=0, on_fraud=0, on_legit=0, agreed=0, rule=None))
+        per_code = defaultdict(lambda: dict(
+            fired=0, on_fraud=0, on_legit=0, agreed=0, rule=None,
+            fraud_amount=Decimal(0), legit_amount=Decimal(0),
+        ))
+        # Money in the application's own currency only; anything else is
+        # counted but not summed, and said so.
+        currency = Loss.currency_of(application.policy)
+        unpriced = 0
 
         for row in rows:
             context = row["context"] or {}
             live_blocked = bool(context.get("should_block"))
+            amount, row_currency = amount_of(row)
+            priced = amount is not None and row_currency == currency
+            if row["label"] in FRAUD | LEGIT and not priced:
+                unpriced += 1
             seen = set()
             for finding in context.get("shadow") or []:
                 code = finding.get("code")
@@ -103,6 +130,10 @@ class Command(BaseCommand):
                 stats["on_fraud"] += row["label"] in FRAUD
                 stats["on_legit"] += row["label"] in LEGIT
                 stats["agreed"] += live_blocked
+                if priced and row["label"] in FRAUD:
+                    stats["fraud_amount"] += amount
+                if priced and row["label"] in LEGIT:
+                    stats["legit_amount"] += amount
 
         codes = {}
         for code, stats in sorted(per_code.items()):
@@ -117,12 +148,17 @@ class Command(BaseCommand):
                 lift=round(fraud_rate / legit_rate, 2) if fraud_rate and legit_rate else None,
                 # How often the live decision blocked when the shadow rule fired.
                 agreement=ratio(stats["agreed"], stats["fired"]),
+                # The money behind the counts: fraud this code would have
+                # caught, and good customers' money it would have turned away.
+                fraud_amount=float(stats["fraud_amount"]),
+                legit_amount=float(stats["legit_amount"]),
             )
 
         return dict(
             application=application.name,
             window=dict(days=days, decisions=len(rows)),
             labels=dict(fraud=len(fraud), legit=len(legit), unlabelled=len(rows) - len(fraud) - len(legit)),
+            money=dict(currency=currency, unpriced=unpriced),
             codes=codes,
         )
 
@@ -133,12 +169,15 @@ class Command(BaseCommand):
             f"in {report['window']['days']} days; labels fraud={report['labels']['fraud']} "
             f"legit={report['labels']['legit']}",
             "",
-            f"  {'code':<34} {'rule':<26} {'fired':>6} {'fraud':>6} {'legit':>6} {'prec':>6} {'lift':>6} {'agree':>6}",
+            f"  money in {report['money']['currency'] or 'no currency'}; {report['money']['unpriced']} labelled rows unpriced",
+            f"  {'code':<34} {'rule':<26} {'fired':>6} {'fraud':>6} {'legit':>6} {'prec':>6} {'lift':>6} {'agree':>6} "
+            f"{'fraud money':>14} {'legit money':>14}",
         ]
         for code, row in report["codes"].items():
             lines.append(
                 f"  {code:<34} {str(row['rule']):<26} {row['fired']:>6} {row['on_fraud']:>6} "
-                f"{row['on_legit']:>6} {str(row['precision']):>6} {str(row['lift']):>6} {str(row['agreement']):>6}"
+                f"{row['on_legit']:>6} {str(row['precision']):>6} {str(row['lift']):>6} {str(row['agreement']):>6} "
+                f"{row['fraud_amount']:>14,.2f} {row['legit_amount']:>14,.2f}"
             )
         if not report["codes"]:
             lines.append("  (no shadow findings in the window)")

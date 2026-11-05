@@ -101,6 +101,12 @@ measurement; run it when the labels have had time to arrive:
 python manage.py shadow_report --application "Figo" --days 14 --record-evidence
 ```
 
+`loss_report --application NAME --days 30` is the number a merchant's fraud
+head wants: what FLIT prevented, leaked and turned away, per currency, from
+the outcomes they reported. It is also `GET /applications/{id}/loss`. Run it
+when you review the shadow period; it is only as complete as the labels and
+amounts the merchant sends.
+
 `verify_audit_chain` walks every application's hash chain and fails when a
 row has been edited or the chain has been broken. The chain only proves
 anything if somebody runs this; wire the exit status to an alert.

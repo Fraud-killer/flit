@@ -27,6 +27,7 @@ the run says so; a person changes the claim.
 """
 
 from collections import defaultdict
+from decimal import Decimal
 from datetime import timedelta
 
 from django.utils import timezone
@@ -34,6 +35,7 @@ from django.utils import timezone
 from core.models import AuditLog, CalibrationRun, CalibrationMode
 from core.scoring import DEFAULT_WEIGHTS, DEFAULT_THRESHOLDS
 from core.services.simulate_policy import SimulatePolicy
+from core.loss import Loss
 
 from .engine import engine_for
 
@@ -70,6 +72,12 @@ class Calibrator:
     # in force. Recall may never fall.
     MAX_FALSE_POSITIVE_RATE = 0.01
     FALSE_POSITIVE_TOLERANCE = 0.002
+    # Money is the unit FLIT exists to protect, so it is a guardrail of its
+    # own: the fraud a candidate lets through plus the good customers' money
+    # it turns away may not grow. Counts can hold steady while the money
+    # moves — one more false positive within the rate tolerance can be a
+    # wire, not a coffee. The tolerance absorbs rounding, nothing else.
+    LOSS_TOLERANCE = 0.001
 
     THRESHOLD_SWEEP = (0.6, 0.65, 0.7, 0.75, 0.8)
 
@@ -89,8 +97,9 @@ class Calibrator:
 
         current_weights = dict((policy.calibration or {}).get("weights") or {})
         current_engine = engine_for(policy)
-        run.before = cls.measure(current_engine, labelled)
-        run.threshold_sweep = cls.sweep(current_engine, labelled)
+        currency = Loss.currency_of(policy)
+        run.before = cls.measure(current_engine, labelled, currency=currency)
+        run.threshold_sweep = cls.sweep(current_engine, labelled, currency=currency)
 
         if len(labelled) < cls.MIN_LABELLED or len(fraud) < cls.MIN_FRAUD:
             run.mode = CalibrationMode.HELD
@@ -107,7 +116,7 @@ class Calibrator:
         run.measured = cls.measured(stats)
 
         proposals = cls.propose(stats, current_weights, current_engine, base_rate=len(fraud) / len(labelled))
-        proposals = cls.screen(proposals, current_weights, policy, labelled, run.before)
+        proposals = cls.screen(proposals, current_weights, policy, labelled, run.before, currency=currency)
         run.proposals = proposals
 
         accepted = [proposal for proposal in proposals if proposal["accepted"]]
@@ -116,7 +125,7 @@ class Calibrator:
             candidate_weights[proposal["code"]] = proposal["to"]
 
         candidate_engine = cls.engine(policy, candidate_weights)
-        run.after = cls.measure(candidate_engine, labelled)
+        run.after = cls.measure(candidate_engine, labelled, currency=currency)
 
         if not accepted:
             run.mode = CalibrationMode.HELD if proposals else CalibrationMode.DRY_RUN
@@ -247,9 +256,17 @@ class Calibrator:
         )
 
     @classmethod
-    def measure(cls, engine, labelled, block_at=None):
+    def measure(cls, engine, labelled, block_at=None, currency=None):
+        """
+        What a policy does to the month, in counts and in money.
+
+        Money is summed in the application's currency only; a row in another
+        currency, or with no amount, is counted and reported as unpriced
+        rather than converted or guessed at.
+        """
         blocked = caught = false_positives = 0
-        fraud_total = legit_total = 0
+        fraud_total = legit_total = unpriced = 0
+        caught_amount = missed_amount = false_positive_amount = Decimal(0)
         threshold = engine.thresholds.block_at if block_at is None else block_at
 
         for row in labelled:
@@ -266,6 +283,19 @@ class Calibrator:
                 caught += is_fraud
                 false_positives += is_legit
 
+            amount, row_currency = Loss.at_stake(decision)
+            if amount is None or currency is None or row_currency != currency:
+                unpriced += 1
+                continue
+            if is_fraud:
+                if is_blocked:
+                    caught_amount += amount
+                else:
+                    missed_amount += amount
+            elif is_legit and is_blocked:
+                false_positive_amount += amount
+
+        priced = len(labelled) - unpriced
         return dict(
             block_at=threshold,
             blocked=blocked,
@@ -275,11 +305,27 @@ class Calibrator:
             precision=SimulatePolicy.ratio(caught, caught + false_positives),
             recall=SimulatePolicy.ratio(caught, fraud_total),
             false_positive_rate=SimulatePolicy.ratio(false_positives, legit_total),
+            # Money. `loss` is what this policy costs the merchant: fraud it
+            # lets through plus good customers' money it turns away.
+            currency=currency,
+            priced=priced,
+            unpriced=unpriced,
+            caught_amount=cls.money(caught_amount),
+            missed_amount=cls.money(missed_amount),
+            false_positive_amount=cls.money(false_positive_amount),
+            loss=cls.money(missed_amount + false_positive_amount) if priced else None,
         )
 
+    @staticmethod
+    def money(value):
+        return float(value.quantize(Decimal("0.01")))
+
     @classmethod
-    def sweep(cls, engine, labelled):
-        return [cls.measure(engine, labelled, block_at=point) for point in cls.THRESHOLD_SWEEP]
+    def sweep(cls, engine, labelled, currency=None):
+        return [
+            cls.measure(engine, labelled, block_at=point, currency=currency)
+            for point in cls.THRESHOLD_SWEEP
+        ]
 
     @classmethod
     def rule_stats(cls, labelled, fraud, legit):
@@ -389,11 +435,11 @@ class Calibrator:
         return proposals
 
     @classmethod
-    def screen(cls, proposals, current_weights, policy, labelled, before):
+    def screen(cls, proposals, current_weights, policy, labelled, before, currency=None):
         """Re-score each proposal on its own against the weights in force."""
         for proposal in proposals:
             candidate = dict(current_weights, **{proposal["code"]: proposal["to"]})
-            after = cls.measure(cls.engine(policy, candidate), labelled)
+            after = cls.measure(cls.engine(policy, candidate), labelled, currency=currency)
             failure = cls.guardrail(before, after)
 
             proposal["effect"] = dict(
@@ -401,6 +447,8 @@ class Calibrator:
                 false_positives=after["false_positives"],
                 recall=after["recall"],
                 false_positive_rate=after["false_positive_rate"],
+                loss=after["loss"],
+                currency=after["currency"],
             )
             proposal["accepted"] = failure is None
             proposal["rejected"] = failure
@@ -437,6 +485,15 @@ class Calibrator:
             )
         if recall_after < recall_before:
             return f"would drop recall from {recall_before:.1%} to {recall_after:.1%}"
+
+        loss_before, loss_after = before.get("loss"), after.get("loss")
+        if loss_before is not None and loss_after is not None:
+            if loss_after > loss_before * (1 + cls.LOSS_TOLERANCE):
+                currency = after.get("currency") or ""
+                return (
+                    f"would raise the money lost or turned away from "
+                    f"{currency} {loss_before:,.2f} to {currency} {loss_after:,.2f}"
+                )
         return None
 
 
@@ -478,6 +535,13 @@ def format_run(run):
             f"  after   recall {_pct(after.get('recall'))}  "
             f"precision {_pct(after.get('precision'))}  "
             f"false positives {_pct(after.get('false_positive_rate'))}"
+        )
+    if before.get("loss") is not None:
+        currency = before.get("currency") or ""
+        lines.append(
+            f"  money   {currency} lost or turned away: before {before.get('loss'):,.2f}"
+            + (f", after {after.get('loss'):,.2f}" if after.get("loss") is not None and after is not before else "")
+            + f"  ({before.get('unpriced', 0)} of {run.labelled} labelled rows unpriced)"
         )
 
     if run.proposals:

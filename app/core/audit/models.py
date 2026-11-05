@@ -96,6 +96,13 @@ class AuditLog(models.Model):
     # Labels arrive after the event, so they stay out of the hash chain.
     label = models.CharField(max_length=20, choices=AuditLogLabel.CHOICES, null=True, blank=True, db_index=True)
     labeled_at = models.DateTimeField(null=True, blank=True)
+    # What the outcome cost, in money. For fraud: what was lost or would have
+    # been. For a legitimate customer FLIT blocked: the business turned away.
+    # Reported with the label; defaults to the transaction's own amount when
+    # the merchant does not say. This is the unit the loss ledger and the
+    # calibrator's loss guardrail add up.
+    loss_amount = models.DecimalField(max_digits=20, decimal_places=2, null=True, blank=True)
+    loss_currency = models.CharField(max_length=3, null=True, blank=True)
 
     previous_hash = models.CharField(max_length=64, null=True, blank=True)
     entry_hash = models.CharField(max_length=64, editable=False)

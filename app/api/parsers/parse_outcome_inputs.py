@@ -3,8 +3,10 @@ from devkit.struct import Struct
 from core.models import AuditLog
 from core.audit.models import AuditLogLabel
 from devkit.checks import is_uuid_str, is_dense_str
-from devkit.messages import msg_uuid, msg_required, msg_in_choices, msg_dense_string
+from devkit.messages import msg_uuid, msg_required, msg_in_choices, msg_dense_string, msg_void_or_decimal
 from core.messages.audits import msg_audit_ref_exist, msg_audit_or_event_id
+from core.messages.monies import msg_currency_code
+from core.loss import to_amount, is_currency_code
 
 from .parse_application_id import parse_application_id
 
@@ -13,6 +15,8 @@ def parse_outcome_inputs(id, request):
     audit_id = request.data.get("audit_id", undefined)
     event_id = request.data.get("event_id", undefined)
     label = request.data.get("label", undefined)
+    amount = request.data.get("amount", undefined)
+    currency_code = request.data.get("currency_code", undefined)
 
     errors = list()
     audit_log = None
@@ -23,6 +27,15 @@ def parse_outcome_inputs(id, request):
     elif label not in AuditLogLabel.VALUES:
         context = dict(choices=AuditLogLabel.VALUES)
         errors.append(msg_in_choices.new(path="label", context=context))
+
+    # The loss as the merchant measured it, after any recovery. Optional:
+    # without it the transaction's own amount stands in.
+    if amount is not undefined and amount is not None and to_amount(amount) is None:
+        errors.append(msg_void_or_decimal.new(path="amount"))
+    if currency_code is not undefined and currency_code is not None and not is_currency_code(currency_code):
+        errors.append(msg_currency_code.new(path="currency_code"))
+    if amount is not undefined and amount is not None and (currency_code is undefined or currency_code is None):
+        errors.append(msg_required.new(path="currency_code"))
 
     if audit_id is undefined and event_id is undefined:
         errors.append(msg_audit_or_event_id.new(path="audit_id"))
@@ -47,6 +60,8 @@ def parse_outcome_inputs(id, request):
     data = None if errors else (
         Struct(
             label=label,
+            amount=None if amount is undefined else to_amount(amount),
+            currency_code=None if currency_code is undefined else currency_code,
             audit_log=audit_log,
             application=application,
         )
