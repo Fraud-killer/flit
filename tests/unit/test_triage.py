@@ -194,7 +194,9 @@ class TestShadowAndGuardrails:
         assert case.triage_auto_closed is False
         assert "shadow" in out.getvalue()
 
-    def test_the_queue_shows_the_proposal(self, case, application):
+    def test_the_queue_hides_the_proposal_until_the_case_is_closed(self, case, application):
+        """A reviewer who can see the proposal is anchored by it, and the precision it is
+        measured by would measure the anchoring. Open cases show only that one exists."""
         from rest_framework.test import APIClient
         from core.auth.actor import Actor
 
@@ -204,7 +206,10 @@ class TestShadowAndGuardrails:
         client = APIClient()
         client.force_authenticate(user=None, token=Actor(application))
         row = client.get(f"/api/v1/applications/{application.id}/cases").data["data"]["cases"][0]
+        assert row["triage"] is None and row["triage_pending"] is True
 
+        case.resolve(status="confirmed_fraud", assignee=application.organization.owner)
+        row = client.get(f"/api/v1/applications/{application.id}/cases?status=all").data["data"]["cases"][0]
         assert row["triage"]["verdict"] == "needs_human"
         assert row["triage"]["summary"] == "One paragraph."
 

@@ -105,6 +105,11 @@ class ApplicationViewSet(ViewSet):
         # rest of the network learn from this merchant's experience.
         PublishOutcome.call(audit_log=audit_log, application=inputs.application)
 
+        # If a model cleared the case behind this decision, the outcome is the
+        # verdict on the model; three wrong in a row stop it clearing.
+        from core.triage import TriageGuardrails
+        TriageGuardrails.record_outcome(inputs.application, audit_log, inputs.label)
+
         return build_api_response(
             data=dict(
                 audit_id=str(audit_log.id),

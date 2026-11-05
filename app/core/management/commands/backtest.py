@@ -84,6 +84,7 @@ class Command(BaseCommand):
                     entries=evidence.from_backtest(report),
                     application=application.name,
                     window=report.get("window"),
+                    label_source=getattr(mapping, "label_source", None),
                 )
                 self.stdout.write(
                     self.style.SUCCESS(f"\nRecorded evidence for {written} rule codes")

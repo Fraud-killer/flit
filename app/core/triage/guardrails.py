@@ -7,11 +7,19 @@ measurement says it has earned it — and goes off again the moment humans
 start overruling it.
 
 - Precision on `cleared` over the last human-closed cases must be at or
-  above the floor, over at least the minimum sample.
+  above the floor, over at least the minimum sample. The reviewer never sees
+  the proposal on an open case, so the measurement is blind. The sample is
+  one hundred: with no disagreement in a hundred, the true miss rate is
+  under about three percent at 95% confidence; fifty would only have bounded
+  it at six.
 - A daily cap on auto-clears per application, so a bad hour is a bad hour.
-- A circuit breaker: three consecutive auto-cleared cases later labelled
-  fraud (a chargeback, a reviewer reopening) and auto-clearing stops for the
+- A circuit breaker: three consecutive auto-cleared cases later shown to be
+  fraud — a reviewer reopening the case, or a fraud or chargeback outcome
+  reported on the decision through the API — and auto-clearing stops for the
   application until a person re-enables it.
+- An auto-clear labels nothing and publishes nothing. The decision stays
+  unlabelled until a person closes the case, so the model's guesses never
+  train the weights or reach the network.
 """
 
 from datetime import timedelta
@@ -22,7 +30,7 @@ from django.utils import timezone
 
 class TriageGuardrails:
     MIN_PRECISION = 0.99
-    MIN_AGREEMENTS = 50
+    MIN_AGREEMENTS = 100
     DAILY_CAP = 200
     MAX_CONSECUTIVE_OVERRIDES = 3
     WINDOW_DAYS = 60
@@ -118,6 +126,21 @@ class TriageGuardrails:
         if count >= cls.MAX_CONSECUTIVE_OVERRIDES:
             cache.set(tripped_key, timezone.now().isoformat(), None)
         return count
+
+    @classmethod
+    def record_outcome(cls, application, audit_log, label):
+        """
+        A merchant reported an outcome on a decision. If the case behind it
+        was auto-cleared and nobody has looked since, this is the network
+        telling us whether the model was right.
+        """
+        from core.audit.models import AuditLogLabel
+
+        case = getattr(audit_log, "case", None)
+        if case is None or not case.triage_auto_closed or case.assignee_id is not None:
+            return None
+        overruled = label in (AuditLogLabel.FRAUD, AuditLogLabel.CHARGEBACK)
+        return cls.record_override(application, overruled=overruled)
 
     @classmethod
     def reset(cls, application):

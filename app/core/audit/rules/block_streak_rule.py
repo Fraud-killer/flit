@@ -24,7 +24,10 @@ class BlockStreakRule(BaseRule):
     techniques = ("F1002",)
     kind = RuleKind.DETECTION
     # Backtested on the Figo export: 271 fires, all on labelled fraud.
-    maturity = Maturity.BACKTESTED
+    # Measured on the Figo replay, whose labels were derived from the blocks
+    # this rule counts; that is an incident replay, not evidence. Shadow
+    # traffic is what earns the next rung.
+    maturity = Maturity.SYNTHETIC_TESTED
     provenance = "tests/unit/test_block_streak.py::TestBlockStreakRule"
     evidence_codes = ("block_streak",)
 

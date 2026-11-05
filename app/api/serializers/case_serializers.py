@@ -9,7 +9,10 @@ def serialize_case(case):
         campaign_key=case.campaign_key,
         decision_count=case.decision_count,
         last_decision_at=case.last_decision_at,
-        triage=None if not case.triage_proposal else dict(
+        # The proposal is shown once the case is closed, never while a reviewer
+        # is deciding: the precision it is measured by has to be blind.
+        triage_pending=bool(case.triage_proposal) and case.status == "open",
+        triage=None if not case.triage_proposal or case.status == "open" else dict(
             verdict=case.triage_proposal.get("verdict"),
             confidence=case.triage_proposal.get("confidence"),
             reason=case.triage_proposal.get("reason"),

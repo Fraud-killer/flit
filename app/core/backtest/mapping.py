@@ -81,6 +81,8 @@ class EventMapping:
         self.values = configuration.get("values") or {}
         self.labels = configuration.get("labels") or {}
         self.label_field = configuration.get("label_field")
+        # merchant_outcomes | reviewer_labels | incident_record | unknown
+        self.label_source = configuration.get("label_source", "unknown")
         self.amount_scale = configuration.get("amount_scale", 1)
         self.timestamp_field = configuration.get("timestamp_field", "timestamp")
         # Either one kind for the whole file (`event_type`), or a column

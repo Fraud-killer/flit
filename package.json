@@ -3,6 +3,8 @@
   "private": true,
   "description": "Dev dependency for the Railway Infrastructure-as-Code file in .railway/railway.ts. Not part of the application.",
   "devDependencies": {
+    "dotenv": "^8.2.0",
+    "node-fetch": "^3.3.2",
     "railway": "^3.16.0"
   }
 }

@@ -36,7 +36,10 @@ class SessionShapeRule(BaseRule, LockCache):
     # Backtested on the Figo export (2026-09-15 to 2026-10-22, 952 labelled
     # fraud events): machine_session fired 300 times and agent_session 307,
     # every one on labelled fraud. The numbers are in the evidence ledger.
-    maturity = Maturity.BACKTESTED
+    # Measured on the Figo replay, whose labels were partly derived from the
+    # client strings this rule reads; an incident replay, not evidence.
+    # Shadow traffic is what earns the next rung.
+    maturity = Maturity.SYNTHETIC_TESTED
     provenance = "tests/unit/test_session_scoring.py::TestEvasiveReplay"
     evidence_codes = ("machine_session", "agent_session")
 

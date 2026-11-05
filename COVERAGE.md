@@ -16,29 +16,43 @@ Mapped against **MITRE Fight Fraud Framework (F3) v1.1**. FLIT does not define i
 
 Coverage of what FLIT can see: **43%** (19/44).
 
-Of the 19 covered techniques, **4** rest on a detector with measured precision and recall. The rest are reasoned but not yet measured — see the ladder below.
+Of the 19 covered techniques, **1** rest on a detector with measured precision and recall. The rest are reasoned but not yet measured — see the ladder below.
 
 ## Evidence ladder
 
 | Rung | Detectors | What it requires |
 |---|---|---|
 | Proposed | 12 | Reasoned from how the fraud works. No evidence yet. |
-| Synthetic-tested | 32 | Fires on a constructed example of the technique and stays quiet on a constructed legitimate lookalike. |
-| Historically backtested | 3 | Run against a merchant's labelled history, with measured precision and recall at the shipped threshold. |
+| Synthetic-tested | 34 | Fires on a constructed example of the technique and stays quiet on a constructed legitimate lookalike. |
+| Historically backtested | 1 | Run against a merchant's labelled history, with measured precision and recall at the shipped threshold. |
 | Shadow-validated | 0 | Run against live traffic without acting on it, and reviewed. |
 | Production-observed | 0 | Acting in production, with its decisions labelled by reviewers. |
 | Outcome-calibrated | 0 | Thresholds set from confirmed outcomes rather than judgement, and re-measured on a schedule. |
 
 `Proposed` is not a criticism. It means the detector is reasoned from how the fraud works and has not been measured against labelled history yet. Nothing above that rung may be claimed without naming the evidence, and the test suite enforces it.
 
+### Measurements that are not evidence
+
+The ledger keeps every replay, including ones whose labels were derived from the features a rule reads. Those are recorded here and carry no rung.
+
+- `account_farming:ip`: measured on Figo replay with labels from incident record; the rule reads the same features the labels were derived from, so this is an incident replay, not evidence.
+- `agent_session`: measured on Figo replay with labels from incident record; the rule reads the same features the labels were derived from, so this is an incident replay, not evidence.
+- `block_streak`: measured on Figo replay with labels from incident record; the rule reads the same features the labels were derived from, so this is an incident replay, not evidence.
+- `bot_detected:http_client`: measured on Figo replay with labels from incident record; the rule reads the same features the labels were derived from, so this is an incident replay, not evidence.
+- `disposable_email_domain`: measured on Figo replay with labels from incident record; the rule reads the same features the labels were derived from, so this is an incident replay, not evidence.
+- `implausible_client_ip`: measured on Figo replay with labels from incident record; the rule reads the same features the labels were derived from, so this is an incident replay, not evidence.
+- `machine_session`: measured on Figo replay with labels from incident record; the rule reads the same features the labels were derived from, so this is an incident replay, not evidence.
+- `multi_accounting:ip`: measured on Figo replay with labels from incident record; the rule reads the same features the labels were derived from, so this is an incident replay, not evidence.
+- `reserved_email_domain`: measured on Figo replay with labels from incident record; the rule reads the same features the labels were derived from, so this is an incident replay, not evidence.
+
 ## Covered techniques
 
 | F3 | Technique | Tactic | Evidence | Detectors |
 |---|---|---|---|---|
 | `F1001` | 3DS Bypass | Stealth | Synthetic-tested | ThreeDSTimeoutRule |
-| `F1002` | Abuse of Public-Facing API | Positioning, Initial Access, Execution | Historically backtested | AutomatedCredentialActionRule, BlockStreakRule, BotSignalRule, ExpectedSignalRule, SessionShapeRule |
+| `F1002` | Abuse of Public-Facing API | Positioning, Initial Access, Execution | Synthetic-tested | AutomatedCredentialActionRule, BlockStreakRule, BotSignalRule, ExpectedSignalRule, SessionShapeRule |
 | `F1005` | Account Manipulation | Positioning, Defense Impairment | Synthetic-tested | AccountTakeoverRule, NewWithdrawalAddressRule |
-| `F1006` | Account Takeover | Initial Access | Historically backtested | AccountSharingRule, AccountTakeoverRule, AutomatedCredentialActionRule, DeviceExpiredRule, NewDeviceCountryRule, ResetToLoginRule, SessionShapeRule, UnregisteredDeviceRule |
+| `F1006` | Account Takeover | Initial Access | Synthetic-tested | AccountSharingRule, AccountTakeoverRule, AutomatedCredentialActionRule, DeviceExpiredRule, NewDeviceCountryRule, ResetToLoginRule, SessionShapeRule, UnregisteredDeviceRule |
 | `F1012` | Card Testing | Positioning | Synthetic-tested | CardTestingRule, IssuerSignalRule, RetryAttackRule |
 | `F1016` | Compromise Payment Gateway | Initial Access | Synthetic-tested | GatewayPatternRule |
 | `F1018` | Convert to Cryptocurrency | Monetization | Synthetic-tested | CryptoCashOutRule |
@@ -53,7 +67,7 @@ Of the 19 covered techniques, **4** rest on a detector with measured precision a
 | `F1047` | Transfer of funds | Monetization | Synthetic-tested | CollectionWalletRule, MuleNetworkRule, PassThroughRule |
 | `T1110` | Brute Force | Initial Access | Proposed | VelocityCheckRule |
 | `T1583` | Acquire Infrastructure | Resource Development | Synthetic-tested | DomainReputationRule, FreshFundingWalletRule, IPConcentrationRule, IPReputationRule |
-| `T1585` | Establish Accounts | Resource Development | Historically backtested | AccountFarmingRule, AccountSharingRule, DisposableEmailRule, DomainReputationRule, EmailPatternRule, FreshFundingWalletRule, MultiAccountingRule, SessionShapeRule |
+| `T1585` | Establish Accounts | Resource Development | Synthetic-tested | AccountFarmingRule, AccountSharingRule, DisposableEmailRule, DomainReputationRule, EmailPatternRule, FreshFundingWalletRule, MultiAccountingRule, SessionShapeRule |
 
 ## Addressable, not yet covered
 
@@ -133,7 +147,7 @@ These happen where a server-side decision layer has no eyes. They are listed so 
 | AccountTakeoverRule | detection | `F1006`, `F1005` | Synthetic-tested | tests/unit/test_credential_takeover.py::TestOctober2026Replay |
 | AmlCftLimitExceededRule | control | — | Proposed | — |
 | AutomatedCredentialActionRule | detection | `F1002`, `F1006` | Synthetic-tested | tests/unit/test_credential_takeover.py::TestOctober2026Replay |
-| BlockStreakRule | detection | `F1002` | Historically backtested | tests/unit/test_block_streak.py::TestBlockStreakRule |
+| BlockStreakRule | detection | `F1002` | Synthetic-tested | tests/unit/test_block_streak.py::TestBlockStreakRule |
 | BotSignalRule | detection | `F1002` | Synthetic-tested | tests/unit/test_intelligence.py::TestBotSignalRule |
 | CardTestingRule | detection | `F1012` | Proposed | — |
 | ChallengeEvasionRule | corroboration | — | Synthetic-tested | tests/unit/test_challenges.py::TestTheLoopCloses |
@@ -170,7 +184,7 @@ These happen where a server-side decision layer has no eyes. They are listed so 
 | ResetToLoginRule | detection | `F1006.003`, `F1006` | Synthetic-tested | tests/unit/test_credential_takeover.py::TestOctober2026Replay |
 | RetryAttackRule | detection | `F1012` | Proposed | — |
 | SanctionedAddressRule | control | — | Synthetic-tested | tests/unit/test_sanctions.py::TestSanctionedAddressRule |
-| SessionShapeRule | detection | `F1002`, `F1006`, `T1585` | Historically backtested | tests/unit/test_session_scoring.py::TestEvasiveReplay |
+| SessionShapeRule | detection | `F1002`, `F1006`, `T1585` | Synthetic-tested | tests/unit/test_session_scoring.py::TestEvasiveReplay |
 | StructuringRule | detection | `F1045` | Historically backtested | Replayed against 11,868 labelled Figo transactions (2026-02-01 to 2026-09-19, 235 fraud / 11,408 legit): fired 56 times, 12 on fraud, lift 13.1, precision 0.214. The only rule in FLIT with measured lift above 1 on that portfolio. Also tests/unit/test_mule_detection.py::TestStructuringRule. |
 | ThreeDSTimeoutRule | detection | `F1001`, `F1039` | Synthetic-tested | tests/unit/test_fraud_rules.py::TestThreeDSTimeoutRule |
 | UnregisteredDeviceRule | detection | `F1006` | Proposed | — |

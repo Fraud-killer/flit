@@ -236,6 +236,9 @@ class Calibrator:
         decisions = (
             AuditLog.objects
             .filter(application_id=application.id, timestamp__gte=since)
+            # A label a model wrote by auto-clearing a case is not ground
+            # truth; only a person's closure or a merchant's outcome is.
+            .exclude(case__triage_auto_closed=True, case__assignee__isnull=True)
             .order_by("-timestamp")[:cls.MAX_DECISIONS]
         )
 

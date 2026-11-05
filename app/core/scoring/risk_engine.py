@@ -95,9 +95,10 @@ class RiskScore:
 
 
 class RiskEngine:
-    # How much of the score a cleared step-up is worth. Enough to take a
-    # borderline decision out of the challenge band; not enough to turn a
-    # block into an allow.
+    # How much of a sub-block score a cleared step-up is worth. Enough to take
+    # a borderline decision out of the challenge band. It is never applied to
+    # a score at or above the block line: a pass answers the challenge, it
+    # does not answer the evidence that blocked.
     CHALLENGE_PASSED_DISCOUNT = 0.4
 
     def __init__(
@@ -132,13 +133,21 @@ class RiskEngine:
             # strength, which is how every rule behaved before.
             base_score = self._severity(context)
 
-            if previous_fraud_count > 0:
+            # The multipliers below say "an unknown actor deserves more
+            # suspicion". That is right for a binary finding, and wrong for
+            # one the rule has already graded: a corroboration the network
+            # rated 0.6 because it rests on a shared address is not made
+            # stronger by the customer having a new phone. A graded finding
+            # keeps its grade.
+            graded = context.get("severity") is not None
+
+            if previous_fraud_count > 0 and not graded:
                 base_score *= (1 + 0.1 * min(previous_fraud_count, 5))
 
-            if account_age_days is not None and account_age_days < 30:
+            if account_age_days is not None and account_age_days < 30 and not graded:
                 base_score *= 1.2
 
-            if device_trust_score is not None:
+            if device_trust_score is not None and not graded:
                 base_score *= (2 - device_trust_score)
 
             factor = RiskFactor(
@@ -173,8 +182,10 @@ class RiskEngine:
 
         # A cleared step-up is worth something: the score it would have
         # challenged on is discounted, and the challenge is not asked again.
-        # A hard block is not touched by it.
-        if passed_challenges and not hard_blocks:
+        # A block is not touched by it, hard or scored: an attacker who can
+        # pass one puzzle on one account must not be able to spend that pass
+        # against the evidence that blocks another.
+        if passed_challenges and not hard_blocks and total_score < self.thresholds.block_at:
             total_score *= (1.0 - self.CHALLENGE_PASSED_DISCOUNT)
 
         if hard_blocks:

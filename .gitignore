@@ -47,8 +47,6 @@ coverage.xml
 *.cover
 
 # Environments
-.env
-.env.local
 .env.*.local
 *.env
 
@@ -95,3 +93,4 @@ Skypay records/
 # Node: only the Railway IaC dev dependency lives at the root (package.json);
 # sdk/node has no dependencies.
 node_modules/
+config.bat
