@@ -2,7 +2,7 @@
 # Base
 #------------------------------------------
 
-FROM python:3.12-alpine3.20 as base
+FROM python:3.11-alpine3.20 as base
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1

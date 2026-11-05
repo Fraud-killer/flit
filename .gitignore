@@ -69,8 +69,9 @@ credentials/
 *.sqlite3
 *.db
 
-# Pipenv
-Pipfile.lock
+# Pipenv: Pipfile.lock is committed on purpose. Railway builds the image from
+# the repository with this file as its ignore list, and the Dockerfile copies
+# the lock; ignoring it here is what made the first build fail.
 temp_auto_push.bat
 temp_interactive_push.bat
 .gitignore

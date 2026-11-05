@@ -1,0 +1,9 @@
+# Build context for Dockerfile.app. Railway falls back to .gitignore when this
+# file is absent; it is here so the image's inputs are stated, not inferred.
+# The image needs app/ and nothing else; app/Pipfile.lock must be present.
+*
+!app/
+app/**/__pycache__/
+app/**/*.pyc
+app/.env
+app/*.db

@@ -24,7 +24,7 @@ const BRANCH = "main";
 // healthcheck.railway.app is the Host header Railway's health check sends;
 // Django returns 400 to a host it does not know, which Railway reads as an
 // unhealthy deploy.
-const PUBLIC_HOSTS: string[] = [];
+const PUBLIC_HOSTS: string[] = ["flit-production.up.railway.app"];
 const ALLOWED_HOSTS = JSON.stringify([...PUBLIC_HOSTS, "healthcheck.railway.app"]);
 const CSRF_TRUSTED_ORIGINS = JSON.stringify(PUBLIC_HOSTS.map((host) => `https://${host}`));
 
@@ -46,7 +46,9 @@ export default defineRailway(() => {
     source: github(REPO, { branch: BRANCH }),
     build,
     deploy: {
-      startCommand: "daphne -b 0.0.0.0 -p $PORT kernel.asgi:application",
+      // No startCommand: the image's CMD (Dockerfile.app) starts daphne on
+      // $PORT. Railway runs a startCommand given here without a shell, so
+      // "$PORT" would reach daphne as four literal characters.
       // Once per deploy, not once per replica: every replica racing to apply
       // the same schema change is what putting migrate in the start command
       // would mean.
@@ -54,7 +56,7 @@ export default defineRailway(() => {
       // /health/ is exempt from the HTTPS redirect (kernel.settings), so the
       // check sees the app rather than a 301.
       healthcheckPath: "/health/",
-      healthcheckTimeout: 30,
+      healthcheckTimeout: 120,
       restartPolicyType: "ON_FAILURE",
       restartPolicyMaxRetries: 3,
     },

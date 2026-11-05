@@ -202,6 +202,10 @@ timeout is what actually protects a signup path — not the average.
   unstyled. Every operational task has a management command precisely so that
   admin is never on the critical path; add whitenoise if you want the admin to
   look right.
-- **The image has not been built in CI.** `Dockerfile.app` is exercised by
-  `docker-compose` locally but no pipeline builds it, so the first Railway
-  build is the first real test of it.
+- **The image is built only by Railway.** `Dockerfile.app` is exercised by
+  `docker-compose` locally and by every Railway deploy, but CI does not build
+  it. Two things the first Railway build taught: the build context is
+  `.dockerignore` (Railway falls back to `.gitignore` without one, which hid
+  `app/Pipfile.lock`), and the base image must be Python 3.11 because that is
+  what the lockfile was resolved for and `pipenv --deploy` refuses anything
+  else.
