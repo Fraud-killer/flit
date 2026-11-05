@@ -65,13 +65,14 @@ service) while that is sorted out.
 
 ## Scheduled jobs
 
-Five matter. Each is its own cron service in `.railway/railway.ts`, built from
+Six matter. Each is its own cron service in `.railway/railway.ts`, built from
 the same image as the API:
 
 ```bash
 python manage.py deliver_webhooks --limit 200   # every 5 minutes — drains the webhook queue
 python manage.py expire_challenges              # every 5 minutes
 python manage.py refresh_sanctions              # daily 03:30 UTC — alert on failure
+python manage.py refresh_threat_intel           # hourly at :15 — Tor exits and IP blocklist into the cache
 python manage.py calibrate --all --apply        # nightly 02:00 UTC — learn from outcomes
 python manage.py verify_audit_chain             # nightly 04:00 UTC — exits non-zero on a break
 ```
@@ -116,9 +117,6 @@ reason is as much the point as an applied one.
 A sanctions list that quietly stopped refreshing is worse than no list, so
 FLIT reports an unloaded or stale list on the decision itself. Alert on the
 job anyway — the report tells the merchant, not you.
-
-`refresh_threat_intel` (Tor exit nodes, IP blocklist) is worth an hourly job
-if IP reputation matters to you.
 
 If a calibration run turns out to have been wrong, undo it by id:
 

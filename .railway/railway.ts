@@ -1,6 +1,6 @@
 // Railway infrastructure for FLIT, applied with `railway config plan` and
 // `railway config apply` (see docs/deployment.md). This file is the whole
-// project: the API, its Postgres and Redis, and the five scheduled jobs.
+// project: the API, its Postgres and Redis, and the six scheduled jobs.
 //
 // Secrets are never written here. SECRET_KEY and MCRYPT_KEY are read from
 // the shell when the file is applied (FLIT_SECRET_KEY, FLIT_MCRYPT_KEY) and
@@ -110,6 +110,9 @@ export default defineRailway(() => {
     // Alert on a non-zero exit: a sanctions list that quietly stopped
     // refreshing is worse than no list.
     job("refresh-sanctions", "refresh_sanctions", "30 3 * * *"),
+    // Tor exit nodes and the IP blocklist that IPIntelligence reads from the
+    // cache. Without this the Tor and blocklist signals are silently empty.
+    job("refresh-threat-intel", "refresh_threat_intel", "15 * * * *"),
     // Learns from the labels that arrived, inside its guardrails.
     job("calibrate", "calibrate --all --apply", "0 2 * * *"),
     // Exits non-zero when a row has been edited or the chain broken. The
