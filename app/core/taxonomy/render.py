@@ -69,6 +69,20 @@ def render(data=None, detector_rows=None):
     )
     add()
 
+    from . import evidence
+    caveats = evidence.notes()
+    if caveats:
+        add("### Measurements that are not evidence")
+        add()
+        add(
+            "The ledger keeps every replay, including ones whose labels were derived "
+            "from the features a rule reads. Those are recorded here and carry no rung."
+        )
+        add()
+        for line in caveats:
+            add(f"- {line}")
+        add()
+
     add("## Covered techniques")
     add()
     add("| F3 | Technique | Tactic | Evidence | Detectors |")

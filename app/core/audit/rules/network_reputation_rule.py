@@ -44,8 +44,11 @@ class NetworkReputationRule(BaseRule):
             code="network_fraud_history",
             path="visit_id",
             text=(
-                f"{verdict.applications} other businesses have confirmed fraud "
+                f"{verdict.organizations} other organizations have confirmed fraud "
                 "or a failed challenge for this actor"
+                + (" (on shared network keys only)" if verdict.shared_only else "")
             ),
-            context=dict(severity=verdict.severity, **verdict.as_context()),
+            # The least the network ever says is "verify this person": a
+            # reportable verdict is a challenge whatever else the score does.
+            context=dict(severity=verdict.severity, force_challenge=True, **verdict.as_context()),
         )

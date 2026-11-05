@@ -259,8 +259,10 @@ class TestNetworkProtectsTheNextMerchant:
         """
         Two contributors is the k-anonymity floor — the least the network can
         legally say. Turning a customer away on the bare minimum is the wrong
-        trade; asking them to verify is not. Corroboration past the floor is
-        what escalates to a block.
+        trade; asking them to verify is not. Corroboration past the floor
+        escalates — to review here, because the history sits on an IP alone
+        and one address is many people. A block needs the actor's own keys
+        (tests/unit/test_review_fixes.py).
         """
         from tests.unit.test_signup_defence import make_visit
 
@@ -286,7 +288,7 @@ class TestNetworkProtectsTheNextMerchant:
             verdicts[contributors] = result
 
         assert verdicts[2].should_challenge and not verdicts[2].should_block
-        assert verdicts[4].should_block
+        assert verdicts[4].should_review and not verdicts[4].should_block
 
     def test_a_clean_actor_is_unaffected_by_the_network(
         self, application, no_geoip,

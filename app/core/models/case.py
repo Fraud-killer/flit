@@ -144,6 +144,12 @@ class Case(models.Model):
 
         label = CaseStatus.LABELS.get(status)
 
+        # An auto-clear is a model's guess. It closes the case; it does not
+        # label the decision and it does not reach the network. The label is
+        # written when a person closes the case, and only then.
+        if self.triage_auto_closed and assignee is None:
+            label = None
+
         if label:
             from core.services.publish_outcome import PublishOutcome
 

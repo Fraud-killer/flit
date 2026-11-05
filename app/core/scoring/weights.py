@@ -90,12 +90,17 @@ class RiskWeights:
     # on the decision, never scored — the point is that it is visible.
     sanctions_screening_unavailable: float = 0.0
     sanctions_list_stale: float = 0.0
-    # Corroboration from other merchants: the one kind of evidence that did
-    # not come from the merchant being protected. Weighted so that the
-    # k-anonymity floor of two contributors lands on a challenge and further
-    # corroboration escalates to a block — the network gets an actor verified,
-    # not turned away, until more than the minimum of it agrees.
-    network_fraud_history: float = 0.7
+    # Corroboration from other organizations: the one kind of evidence that
+    # did not come from the merchant being protected. The verdict grades
+    # itself (core.services.network_reputation.NetworkVerdict.severity) and a
+    # graded finding is not inflated for a new device or account, so this
+    # weight is calibrated to that schedule: two organizations (the k-anonymity
+    # floor, severity 0.55) land in the challenge band; three reach review;
+    # four on the actor's own keys (0.85) cross the block line. History that
+    # sits only on an IP or ASN is capped at 0.6 and so tops out at review:
+    # one address is many people, and the network gets them verified, not
+    # turned away.
+    network_fraud_history: float = 0.85
     challenge_evasion: float = 0.7
     # Credential surface. A reset that turns into a login faster than a
     # person reads an email is the takeover itself, not a hint of one, so it

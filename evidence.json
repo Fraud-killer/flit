@@ -2,7 +2,9 @@
   "codes": {
     "account_farming:ip": {
       "application": "Figo replay",
+      "circular": true,
       "fired": 253,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 253,
@@ -16,7 +18,9 @@
     },
     "adversarial_email_local_part": {
       "application": "Figo replay",
+      "circular": false,
       "fired": 24,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 24,
@@ -30,7 +34,9 @@
     },
     "agent_session": {
       "application": "Figo replay",
+      "circular": true,
       "fired": 307,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 307,
@@ -44,7 +50,9 @@
     },
     "automated_credential_action": {
       "application": "Figo replay",
+      "circular": false,
       "fired": 77,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 77,
@@ -58,7 +66,9 @@
     },
     "block_streak": {
       "application": "Figo replay",
+      "circular": true,
       "fired": 271,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 271,
@@ -72,7 +82,9 @@
     },
     "bot_detected:http_client": {
       "application": "Figo replay",
+      "circular": true,
       "fired": 103,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 103,
@@ -86,7 +98,9 @@
     },
     "credit_structuring": {
       "application": "Figo replay",
+      "circular": false,
       "fired": 24,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 0,
@@ -100,7 +114,9 @@
     },
     "crypto_cash_out": {
       "application": "Figo",
+      "circular": false,
       "fired": 38,
+      "label_source": "merchant_outcomes",
       "lift": null,
       "measured_at": null,
       "on_fraud": 0,
@@ -114,7 +130,9 @@
     },
     "disposable_email_domain": {
       "application": "Figo replay",
+      "circular": true,
       "fired": 391,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 391,
@@ -128,7 +146,9 @@
     },
     "dormant_account_activity": {
       "application": "Figo",
+      "circular": false,
       "fired": 36,
+      "label_source": "merchant_outcomes",
       "lift": null,
       "measured_at": null,
       "on_fraud": 0,
@@ -142,7 +162,9 @@
     },
     "generated_email_local_part": {
       "application": "Figo replay",
+      "circular": false,
       "fired": 212,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 174,
@@ -156,7 +178,9 @@
     },
     "high_failure_rate": {
       "application": "Figo replay",
+      "circular": false,
       "fired": 48,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 0,
@@ -170,7 +194,9 @@
     },
     "implausible_client_ip": {
       "application": "Figo replay",
+      "circular": true,
       "fired": 40,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 40,
@@ -184,7 +210,9 @@
     },
     "machine_session": {
       "application": "Figo replay",
+      "circular": true,
       "fired": 300,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 300,
@@ -198,7 +226,9 @@
     },
     "multi_accounting:ip": {
       "application": "Figo replay",
+      "circular": true,
       "fired": 232,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 232,
@@ -212,7 +242,9 @@
     },
     "new_withdrawal_address": {
       "application": "Figo",
+      "circular": false,
       "fired": 22,
+      "label_source": "merchant_outcomes",
       "lift": null,
       "measured_at": null,
       "on_fraud": 0,
@@ -226,7 +258,9 @@
     },
     "pass_through_funds": {
       "application": "Figo replay",
+      "circular": false,
       "fired": 215,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 0,
@@ -240,7 +274,9 @@
     },
     "policy_currency_mismatch": {
       "application": "Figo replay",
+      "circular": false,
       "fired": 4123,
+      "label_source": "incident_record",
       "lift": 0.01,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 5,
@@ -254,7 +290,9 @@
     },
     "reserved_email_domain": {
       "application": "Figo replay",
+      "circular": true,
       "fired": 25,
+      "label_source": "incident_record",
       "lift": null,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 22,
@@ -268,7 +306,9 @@
     },
     "reset_then_login": {
       "application": "Figo replay",
+      "circular": false,
       "fired": 48,
+      "label_source": "incident_record",
       "lift": 34.57,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 23,
@@ -282,7 +322,9 @@
     },
     "sanctions_screening_unavailable": {
       "application": "Figo replay",
+      "circular": false,
       "fired": 27,
+      "label_source": "incident_record",
       "lift": 0.26,
       "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 1,
@@ -296,7 +338,9 @@
     },
     "velocity_exceeded_per_hour": {
       "application": "Figo",
+      "circular": false,
       "fired": 4,
+      "label_source": "merchant_outcomes",
       "lift": null,
       "measured_at": null,
       "on_fraud": 0,
@@ -310,7 +354,9 @@
     },
     "velocity_exceeded_per_minute": {
       "application": "Figo",
+      "circular": false,
       "fired": 43,
+      "label_source": "merchant_outcomes",
       "lift": null,
       "measured_at": null,
       "on_fraud": 0,

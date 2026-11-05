@@ -39,19 +39,47 @@ def load(path=None):
         return {}
 
 
-def record(*, entries, application, window, path=None):
+# Where a dataset's labels came from decides what a measurement can prove.
+# `incident_record` means the labels were derived from features of the attack
+# itself (hostile addresses, scripted client strings, throwaway domains, the
+# window the attacker held an account). A rule that reads those same features
+# measured against those labels is measuring the labeller, not the fraud: the
+# entry is kept, marked circular, and does not support a measured rung.
+LABEL_SOURCES = ("merchant_outcomes", "reviewer_labels", "incident_record", "unknown")
+
+# Features an incident record labels on, and the rule codes that read them.
+CIRCULAR_CODES = {
+    "incident_record": {
+        "disposable_email_domain", "reserved_email_domain", "bot_detected:http_client",
+        "bot_detected:automation", "suspicious_user_agent", "implausible_client_ip",
+        "account_farming:ip", "multi_accounting:ip", "account_farming:asn", "multi_accounting:asn",
+        "machine_session", "agent_session", "block_streak", "threat_ip", "tor_exit_node",
+        "datacenter_ip", "ip_blocklisted",
+    },
+}
+
+
+def is_circular(code, label_source):
+    return code in CIRCULAR_CODES.get(label_source or "", set())
+
+
+def record(*, entries, application, window, path=None, label_source=None):
     """
     Write measurements for one backtest run.
 
     Entries are merged by code, most recent measurement winning, so a rule
-    measured against several portfolios keeps the latest for each.
+    measured against several portfolios keeps the latest for each. Every
+    entry records where its labels came from and whether the measurement is
+    circular for that code.
     """
     path = Path(path) if path else ledger_path()
     existing = load(path)
+    label_source = label_source if label_source in LABEL_SOURCES else "unknown"
 
     for code, measurement in entries.items():
         existing[code] = dict(
             measurement, application=application, window=window,
+            label_source=label_source, circular=is_circular(code, label_source),
         )
 
     path.write_text(json.dumps(
@@ -102,5 +130,27 @@ def unsupported_claims(detector_rows, ledger=None):
         missing = [code for code in codes if code not in ledger]
         if missing:
             offenders.append(f"{row['rule']} ({', '.join(missing)} not measured)")
+            continue
+
+        # A measurement whose labels were derived from the features the rule
+        # reads proves nothing about the rule. It stays in the ledger as a
+        # record of the replay, and it does not carry a rung.
+        circular = [code for code in codes if ledger[code].get("circular")]
+        if circular:
+            offenders.append(f"{row['rule']} ({', '.join(circular)} measured against circular labels)")
 
     return offenders
+
+
+def notes(ledger=None):
+    """One line per code whose measurement needs a caveat, for the matrix."""
+    ledger = load() if ledger is None else ledger
+    lines = []
+    for code, entry in sorted(ledger.items()):
+        if entry.get("circular"):
+            lines.append(
+                f"`{code}`: measured on {entry.get('application')} with labels from "
+                f"{entry.get('label_source', 'unknown').replace('_', ' ')}; the rule reads the same "
+                "features the labels were derived from, so this is an incident replay, not evidence."
+            )
+    return lines
