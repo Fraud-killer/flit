@@ -9,6 +9,11 @@ from django.utils import timezone
 from core.scoring.weights import RiskWeights, RiskThresholds, DEFAULT_WEIGHTS, DEFAULT_THRESHOLDS
 
 
+# Below this a score is not worth watching. Not a decision threshold, so not
+# calibrated; the thresholds that act are on RiskThresholds.
+MONITOR_AT = 0.3
+
+
 class RiskLevel(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
@@ -16,15 +21,21 @@ class RiskLevel(str, Enum):
     CRITICAL = "critical"
 
     @classmethod
-    def from_score(cls, score: float) -> "RiskLevel":
-        if score < 0.3:
-            return cls.LOW
-        elif score < 0.5:
-            return cls.MEDIUM
-        elif score < 0.7:
-            return cls.HIGH
-        else:
+    def from_score(cls, score: float, thresholds: Optional[RiskThresholds] = None) -> "RiskLevel":
+        """
+        The level reads from the same thresholds the decision does. A
+        calibrated application that blocks at 0.6 reports a 0.65 as critical,
+        because that is what it did with it.
+        """
+        thresholds = thresholds or DEFAULT_THRESHOLDS
+
+        if score >= thresholds.block_at:
             return cls.CRITICAL
+        if score >= thresholds.review_at:
+            return cls.HIGH
+        if score >= min(MONITOR_AT, thresholds.review_at):
+            return cls.MEDIUM
+        return cls.LOW
 
 
 @dataclass
@@ -84,6 +95,11 @@ class RiskScore:
 
 
 class RiskEngine:
+    # How much of the score a cleared step-up is worth. Enough to take a
+    # borderline decision out of the challenge band; not enough to turn a
+    # block into an allow.
+    CHALLENGE_PASSED_DISCOUNT = 0.4
+
     def __init__(
         self,
         weights: Optional[RiskWeights] = None,
@@ -143,20 +159,55 @@ class RiskEngine:
 
         total_score = max(0.0, min(1.0, total_score))
 
-        level = RiskLevel.from_score(total_score)
-        should_block = total_score >= self.thresholds.block_at
-        should_review = total_score >= self.thresholds.review_at
+        # Two findings sit outside the arithmetic. A hard block — a sanctions
+        # hit — is not a risk to be weighed against a clean history: the
+        # history is irrelevant to whether the counterparty is listed. And a
+        # forced review marks a decision whose evidence is incomplete because
+        # a control could not run; the score says nothing about that, so the
+        # flag has to.
+        hard_blocks = [f.code for f in factors if (f.context or {}).get("hard_block")]
+        forced_reviews = [f.code for f in factors if (f.context or {}).get("force_review")]
+        forced_challenges = [f.code for f in factors if (f.context or {}).get("force_challenge")]
+        allows = [f.code for f in factors if (f.context or {}).get("allow")]
+        passed_challenges = [f.code for f in factors if (f.context or {}).get("passed_challenge")]
+
+        # A cleared step-up is worth something: the score it would have
+        # challenged on is discounted, and the challenge is not asked again.
+        # A hard block is not touched by it.
+        if passed_challenges and not hard_blocks:
+            total_score *= (1.0 - self.CHALLENGE_PASSED_DISCOUNT)
+
+        if hard_blocks:
+            total_score = max(total_score, self.thresholds.block_at)
+
+        level = RiskLevel.from_score(total_score, self.thresholds)
+        should_block = bool(hard_blocks) or total_score >= self.thresholds.block_at
+        should_review = bool(forced_reviews) or total_score >= self.thresholds.review_at
 
         # A step-up sits below a block deliberately. At the signup surface the
         # evidence is thin by nature, and blocking on thin evidence costs real
         # customers; a challenge makes the eleventh account cost as much as
         # the first without charging the honest user anything but one puzzle.
-        should_challenge = (
-            not should_block and total_score >= self.thresholds.challenge_at
+        should_challenge = not should_block and (
+            bool(forced_challenges) or total_score >= self.thresholds.challenge_at
         )
 
+        # An allow is the weakest instruction here. It waives the review and
+        # challenge the *score* asked for; it does not touch a block, and it
+        # does not silence a control that did not run.
+        if allows and not hard_blocks:
+            should_review = bool(forced_reviews)
+            should_challenge = False
+
+        if passed_challenges and not hard_blocks:
+            should_challenge = False
+
         recommendation = self._get_recommendation(
-            level, factors, should_challenge=should_challenge,
+            level, factors,
+            should_block=should_block,
+            should_challenge=should_challenge,
+            should_review=should_review,
+            forced_reviews=forced_reviews,
         )
 
         confidence = self._calculate_confidence(factors, historical_risk_scores)
@@ -176,6 +227,11 @@ class RiskEngine:
                 "event_category": event_category,
                 "has_historical_data": historical_risk_scores is not None,
                 "coverage": coverage,
+                "hard_blocks": hard_blocks,
+                "forced_reviews": forced_reviews,
+                "forced_challenges": forced_challenges,
+                "allows": allows,
+                "passed_challenges": passed_challenges,
             },
         )
 
@@ -231,9 +287,19 @@ class RiskEngine:
         level: RiskLevel,
         factors: List[RiskFactor],
         *,
+        should_block: Optional[bool] = None,
         should_challenge: bool = False,
+        should_review: Optional[bool] = None,
+        forced_reviews: Optional[List[str]] = None,
     ) -> str:
-        if level == RiskLevel.CRITICAL:
+        # The words follow the flags an integration branches on, so the two
+        # can never disagree once thresholds are calibrated.
+        if should_block is None:
+            should_block = level == RiskLevel.CRITICAL
+        if should_review is None:
+            should_review = level in (RiskLevel.HIGH, RiskLevel.CRITICAL)
+
+        if should_block:
             return "BLOCK: High-risk activity detected. Recommend blocking transaction and triggering manual review."
 
         if should_challenge:
@@ -245,7 +311,10 @@ class RiskEngine:
                 " Evidence is short of a block but the action should cost more than one request."
             )
 
-        if level == RiskLevel.HIGH:
+        if should_review:
+            if forced_reviews and level not in (RiskLevel.HIGH, RiskLevel.CRITICAL):
+                names = ", ".join(forced_reviews[:3])
+                return f"REVIEW: A control did not run ({names}). The decision is incomplete and needs a look."
             high_weight_factors = [f for f in factors if f.weight >= 0.7]
             if high_weight_factors:
                 factor_names = ", ".join(f.code for f in high_weight_factors[:3])

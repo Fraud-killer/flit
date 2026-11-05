@@ -1,4 +1,6 @@
 import hashlib
+import hmac
+import json
 from uuid import uuid4
 from django.db import models
 from django.utils import timezone
@@ -114,7 +116,14 @@ class AuditLog(models.Model):
             self.entry_hash = self._compute_hash()
         super().save(*args, **kwargs)
 
-    def _compute_hash(self) -> str:
+    # What the hash covers. Version 1 covered the envelope and not the
+    # decision, so a changed risk score or factor list verified clean — the
+    # one tampering that matters in a fraud log. Version 2 covers the
+    # decision too. Rows written under version 1 still verify against it, so
+    # history is not orphaned by the upgrade.
+    HASH_VERSION = 2
+
+    def _compute_hash(self, version: int = HASH_VERSION) -> str:
         content = (
             f"{self.timestamp.isoformat()}:"
             f"{self.level}:"
@@ -128,10 +137,27 @@ class AuditLog(models.Model):
             f"{self.outcome}:"
             f"{self.previous_hash or 'genesis'}"
         )
+
+        if version >= 2:
+            content += (
+                f":v2:{self.user_agent}:{self.device_fingerprint}:"
+                f"{self.risk_score}:"
+                f"{self._canonical(self.risk_factors)}:"
+                f"{self._canonical(self.context)}"
+            )
+
         return hashlib.sha256(content.encode()).hexdigest()
 
+    @staticmethod
+    def _canonical(value) -> str:
+        """One byte sequence per value, whatever order the keys came in."""
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+
     def verify_integrity(self) -> bool:
-        return self.entry_hash == self._compute_hash()
+        return any(
+            hmac.compare_digest(self.entry_hash, self._compute_hash(version))
+            for version in range(self.HASH_VERSION, 0, -1)
+        )
 
     def __str__(self):
         return f"[{self.timestamp}] {self.level.upper()}: {self.category}/{self.action}"

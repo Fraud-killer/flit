@@ -130,6 +130,42 @@ class Config(metaclass=ConfigMeta):
         return json.loads(value) if value else {}
 
     @variable
+    def trusted_proxy_depth(self, ctx):
+        """
+        How many proxies in front of FLIT append to X-Forwarded-For. With
+        depth N the client address is the Nth entry from the right; the
+        entries before it were written by whoever sent the request and are
+        not trusted. Unset keeps the legacy reading (first entry), which an
+        attacker can forge — set it in any deployment behind a load balancer.
+        """
+        value = ctx.load.env("TRUSTED_PROXY_DEPTH")
+        if value is None or str(value).strip() == "":
+            return None
+        try:
+            depth = int(value)
+        except (TypeError, ValueError):
+            raise VariableError("TRUSTED_PROXY_DEPTH must be a whole number")
+        if depth < 0:
+            raise VariableError("TRUSTED_PROXY_DEPTH must be zero or more")
+        return depth
+
+    @variable
+    def triage_enabled(self, ctx):
+        """
+        Whether the case queue may be read by a model (core.triage). Off by
+        default: FLIT's decision path never depends on it, and a merchant
+        turns it on after reading what it would have proposed in shadow.
+        """
+        value = ctx.load.env("TRIAGE_ENABLED", False)
+        value, error = execute(to_bool, value)
+        if not error: return value
+        raise VariableError(msg_to_bool.text)
+
+    @variable
+    def triage_model(self, ctx):
+        return ctx.load.env("TRIAGE_MODEL", "claude-opus-5-5")
+
+    @variable
     def redis_url(self, ctx):
         return ctx.load.env("REDIS_URL", "redis://localhost:6379/0")
 

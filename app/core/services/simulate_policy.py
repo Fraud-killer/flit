@@ -99,6 +99,7 @@ class SimulatePolicy:
         return RiskThresholds(
             block_at=float(thresholds.get("block_at", DEFAULT_THRESHOLDS.block_at)),
             review_at=float(thresholds.get("review_at", DEFAULT_THRESHOLDS.review_at)),
+            challenge_at=float(thresholds.get("challenge_at", DEFAULT_THRESHOLDS.challenge_at)),
         )
 
     @classmethod
@@ -128,7 +129,7 @@ class SimulatePolicy:
 
         return dict(
             score=total,
-            level=RiskLevel.from_score(total).value,
+            level=RiskLevel.from_score(total, engine.thresholds).value,
             blocked=total >= engine.thresholds.block_at,
             reviewed=total >= engine.thresholds.review_at,
         )
@@ -185,7 +186,11 @@ class SimulatePolicy:
 
     @staticmethod
     def describe_thresholds(thresholds):
-        return dict(block_at=thresholds.block_at, review_at=thresholds.review_at)
+        return dict(
+            block_at=thresholds.block_at,
+            review_at=thresholds.review_at,
+            challenge_at=thresholds.challenge_at,
+        )
 
     @staticmethod
     def is_fraud(decision):

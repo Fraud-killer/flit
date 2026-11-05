@@ -414,3 +414,273 @@ class TestSessionShapeRule:
         reason = next(r for r in result.reasons if r.code == "machine_session")
         assert "others_credentials" in reason.context["signals"]
         assert reason.context["features"]["registrations"] == 4
+
+
+# -- Agent-driven sessions ----------------------------------------------------
+
+AGENT_UA = "Claude-User (claude-code/2.1.0; +https://support.anthropic.com/)"
+
+
+def write_event(application, *, ip_address, user_agent, action, actor_id, seconds_ago,
+                blocked=False, outcome=None, category=None):
+    """
+    One past event written straight into history with a precise timestamp.
+    Sub-second spacing matters here, so these bypass the auditor.
+    """
+    from core.audit.logger import AuditLogger
+    from core.audit.models import AuditLog, AuditLogCategory, AuditLogLevel
+
+    log = AuditLogger.log(
+        level=AuditLogLevel.INFO,
+        category=category or AuditLogCategory.AUTHENTICATION,
+        action=action,
+        actor_type="client",
+        actor_id=actor_id,
+        application_id=application.id,
+        ip_address=ip_address,
+        user_agent=user_agent,
+        outcome=outcome,
+        context=dict(should_block=blocked, should_review=blocked),
+    )
+    AuditLog.objects.filter(id=log.id).update(
+        timestamp=timezone.now() - timedelta(seconds=seconds_ago),
+    )
+    return log
+
+
+def agent_session(application, *, ip_address=ATTACKER_IP, bursts=3, user_agent=None,
+                  think_gap=8.0, blocked=False):
+    """
+    What a model with a shell looks like from the server: a burst of calls
+    issued together, a pause while it composes the next step, another burst.
+    Each burst works a different account; refusals are answered with a
+    different action.
+    """
+    seconds_ago = 600.0
+    for burst in range(bursts):
+        actor = f"target_{burst:02d}"
+        ua = user_agent or ROTATING_CLIENTS[burst % len(ROTATING_CLIENTS)]
+        for step, action in enumerate(("password_reset_requested", "login", "email_change")):
+            write_event(
+                application, ip_address=ip_address, user_agent=ua, action=action,
+                actor_id=actor, seconds_ago=seconds_ago - step * 0.25,
+                blocked=blocked and step == 0,
+            )
+        seconds_ago -= 3 * 0.25 + think_gap
+
+
+def batching_sdk(application, *, ip_address="102.91.133.202", calls=12):
+    """A merchant's own integration flushing a queue: steady 200 ms spacing, one client, one account."""
+    for index in range(calls):
+        write_event(
+            application, ip_address=ip_address, user_agent=BROWSER, action="login",
+            actor_id="batch_user", seconds_ago=600 - index * 0.2,
+        )
+
+
+class TestClientClass:
+    def test_agent_clients_are_a_class_of_their_own(self):
+        from core.intelligence.bot_detection import BotDetector
+
+        assert BotDetector.client_class(AGENT_UA) == "agent"
+        assert BotDetector.client_class("Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)") == "agent"
+        assert BotDetector.client_class("ChatGPT-User/1.0") == "agent"
+        assert BotDetector.client_class("PerplexityBot/1.0") == "agent"
+
+    def test_the_other_classes(self):
+        from core.intelligence.bot_detection import BotDetector
+
+        assert BotDetector.client_class(BROWSER) == "browser"
+        assert BotDetector.client_class("python-requests/2.31.0") == "http_library"
+        assert BotDetector.client_class("curl/8.5.0") == "http_library"
+        assert BotDetector.client_class("Mozilla/5.0 HeadlessChrome/120.0") == "automation"
+        assert BotDetector.client_class("Googlebot/2.1 (+http://www.google.com/bot.html)") == "crawler"
+        assert BotDetector.client_class("") == "unknown"
+        assert BotDetector.client_class(None) == "unknown"
+
+    def test_an_agent_client_is_flagged_by_the_bot_rule(self):
+        from core.intelligence.bot_detection import BotDetector
+
+        result = BotDetector.detect(AGENT_UA)
+        assert result.is_bot
+        assert result.bot_type == "agent"
+        assert not BotDetector.is_allowed_bot(result)
+
+
+class TestCadence:
+    def profile(self, offsets, **extra):
+        from core.services.session_activity import SessionProfile
+
+        now = timezone.now()
+        events = [
+            dict(timestamp=now + timedelta(seconds=offset), action="login", actor_id=f"a{i}",
+                 user_agent=BROWSER, category=None, risk_score=None, blocked=None, outcome=None)
+            for i, offset in enumerate(offsets)
+        ]
+        for event in events:
+            event.update(extra)
+        return SessionProfile(origin=None, events=events)
+
+    def test_bursts_and_think_gaps_are_counted(self):
+        # three bursts of three, 8 s apart
+        offsets = [0, 0.2, 0.4, 8.4, 8.6, 8.8, 17, 17.2, 17.4]
+        cadence = self.profile(offsets).cadence()
+
+        assert cadence["burst_ratio"] == 0.75
+        assert cadence["think_gaps"] == 2
+
+    def test_a_steady_script_has_no_think_gaps(self):
+        cadence = self.profile([i * 0.2 for i in range(12)]).cadence()
+        assert cadence["burst_ratio"] == 1.0
+        assert cadence["think_gaps"] == 0
+
+    def test_a_person_has_no_bursts(self):
+        cadence = self.profile([0, 12, 30, 51, 70]).cadence()
+        assert cadence["burst_ratio"] == 0.0
+        assert cadence["think_gaps"] == 0
+
+    def test_adaptive_retries_are_refusals_answered_differently(self):
+        from core.services.session_activity import SessionProfile
+
+        now = timezone.now()
+
+        def at(seconds, action, actor, blocked=False):
+            return dict(timestamp=now + timedelta(seconds=seconds), action=action, actor_id=actor,
+                        user_agent=BROWSER, category=None, risk_score=None, blocked=blocked, outcome=None)
+
+        profile = SessionProfile(origin=None, events=[
+            at(0, "login", "a", blocked=True),
+            at(5, "login", "b"),                 # same action, different account: adapted
+            at(10, "login", "b", blocked=True),
+            at(14, "password_reset_requested", "b"),  # different action: adapted
+            at(20, "login", "c", blocked=True),
+            at(25, "login", "c"),                # identical retry: a person
+            at(30, "login", "d", blocked=True),
+            at(300, "email_change", "d"),        # too late to be a reaction
+        ])
+
+        assert profile.adaptive_retries() == 2
+
+
+class TestAgentReplay:
+    """
+    One operator, a model and a shell, working accounts it did not create.
+
+    The event rules see nothing: no user-agent list is tripped (the client
+    string rotates), the reset-to-login interval is respectable, and each
+    account is touched three times. The session sees a rhythm no person
+    keeps: calls issued together, silence while the model thinks, the next
+    account.
+    """
+
+    def test_the_rhythm_reads_as_an_agent(self, application, no_geoip):
+        agent_session(application, bursts=3)
+
+        result = login(
+            application, client_id="target_03", ip_address=ATTACKER_IP,
+            user_agent=ROTATING_CLIENTS[3], seconds_ago=0,
+        )
+
+        assert "agent_session" in codes(result)
+        reason = next(r for r in result.reasons if r.code == "agent_session")
+        assert "bimodal_cadence" in reason.context["signals"]
+
+    def test_refusals_answered_differently_read_as_an_agent(self, application, no_geoip):
+        agent_session(application, bursts=3, think_gap=60.0, blocked=True)
+
+        result = login(
+            application, client_id="target_03", ip_address=ATTACKER_IP,
+            user_agent=ROTATING_CLIENTS[3], seconds_ago=0,
+        )
+
+        reason = next((r for r in result.reasons if r.code == "agent_session"), None)
+        assert reason is not None
+        assert "adaptive_retry" in reason.context["signals"]
+
+    def test_an_agent_client_string_corroborates_but_does_not_decide(self, application, no_geoip):
+        """One agent user-agent on a quiet account is a curiosity, not a machine session."""
+        write_event(
+            application, ip_address=OWNER_IP, user_agent=AGENT_UA, action="login",
+            actor_id="curious", seconds_ago=120,
+        )
+        for seconds in (400, 900, 1500):
+            write_event(
+                application, ip_address=OWNER_IP, user_agent=BROWSER, action="login",
+                actor_id="curious", seconds_ago=seconds,
+            )
+
+        result = login(
+            application, client_id="curious", ip_address=OWNER_IP,
+            user_agent=BROWSER, seconds_ago=0,
+        )
+
+        assert "machine_session" not in codes(result)
+        assert "agent_session" not in codes(result)
+
+    def test_a_merchants_batching_sdk_is_not_an_agent(self, application, no_geoip):
+        """Steady sub-second spacing, one client, one account: a queue flushing, not a model thinking."""
+        batching_sdk(application)
+
+        result = login(
+            application, client_id="batch_user", ip_address="102.91.133.202",
+            user_agent=BROWSER, seconds_ago=0,
+        )
+
+        assert "agent_session" not in codes(result)
+
+    def test_the_decision_names_the_shape(self, application, no_geoip):
+        agent_session(application, bursts=3)
+
+        result = login(
+            application, client_id="target_03", ip_address=ATTACKER_IP,
+            user_agent=ROTATING_CLIENTS[3], seconds_ago=0,
+        )
+
+        reason = next(r for r in result.reasons if r.code == "agent_session")
+        assert reason.context["think_gaps"] >= 2
+        assert reason.context["burst_ratio"] >= 0.3
+
+
+class TestRateLimitedOrigins:
+    def breaches(self, application, count=3):
+        from core.audit.models import AuditLogCategory
+
+        for index in range(count):
+            write_event(
+                application, ip_address=ATTACKER_IP, user_agent="curl/8.5.0", action="rate_limited",
+                actor_id=None, seconds_ago=300 - index * 30, category=AuditLogCategory.SECURITY,
+            )
+
+    def test_breaches_corroborate_a_machine_session(self, application, no_geoip):
+        """Hitting the limiter, from many accounts, with rotating clients."""
+        self.breaches(application)
+        for index, seconds in enumerate((150, 120, 90, 60)):
+            write_event(
+                application, ip_address=ATTACKER_IP, user_agent=ROTATING_CLIENTS[index],
+                action="login", actor_id=f"acct_{index}", seconds_ago=seconds,
+            )
+
+        result = login(
+            application, client_id="acct_9", ip_address=ATTACKER_IP,
+            user_agent=ROTATING_CLIENTS[4], seconds_ago=0,
+        )
+
+        reason = next((r for r in result.reasons if r.code == "machine_session"), None)
+        assert reason is not None
+        assert "rate_limited" in reason.context["signals"]
+
+    def test_breaches_alone_do_not_decide(self, application, no_geoip):
+        """A merchant's own integration retrying into the limiter is not an attack."""
+        self.breaches(application)
+        for seconds in (120, 60):
+            write_event(
+                application, ip_address=OWNER_IP, user_agent=BROWSER, action="login",
+                actor_id="one_person", seconds_ago=seconds,
+            )
+
+        result = login(
+            application, client_id="one_person", ip_address=OWNER_IP,
+            user_agent=BROWSER, seconds_ago=0,
+        )
+
+        assert "machine_session" not in codes(result)

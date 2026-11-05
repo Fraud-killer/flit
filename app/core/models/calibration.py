@@ -13,11 +13,15 @@ class CalibrationMode:
     # labels, or the proposals together failed a guardrail. The reason says
     # which, and that is what a reviewer reads.
     HELD = "held"
+    # An earlier applied run was undone: its accepted proposals were put
+    # back to the weights they moved from.
+    ROLLED_BACK = "rolled_back"
 
     CHOICES = [
         (DRY_RUN, "Dry run — computed, not applied"),
         (APPLIED, "Applied — the policy was changed"),
         (HELD, "Held — the evidence did not justify a change"),
+        (ROLLED_BACK, "Rolled back — an applied run was undone"),
     ]
 
     VALUES = [value for value, _ in CHOICES]

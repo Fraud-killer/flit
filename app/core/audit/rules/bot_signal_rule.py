@@ -17,6 +17,25 @@ class BotSignalRule(BaseRule):
     maturity = Maturity.SYNTHETIC_TESTED
     provenance = "tests/unit/test_intelligence.py::TestBotSignalRule"
 
+    # The end user's request headers a merchant may forward as `headers`.
+    # Only these are read; the rest of the map is ignored, so a merchant
+    # cannot accidentally hand FLIT cookies or tokens.
+    FORWARDED_HEADERS = (
+        "Accept-Language", "Accept-Encoding", "Accept",
+        "X-Requested-With", "X-Automation", "X-Selenium", "X-Puppeteer",
+        "Sec-CH-UA", "Sec-Fetch-Mode", "Sec-Fetch-Site",
+    )
+
+    def forwarded_headers(self):
+        raw = (getattr(self.event, "extra", None) or {}).get("headers")
+        if not isinstance(raw, dict):
+            return None
+        lowered = {str(k).lower(): v for k, v in raw.items()}
+        return {
+            name: lowered[name.lower()]
+            for name in self.FORWARDED_HEADERS if name.lower() in lowered
+        }
+
     @property
     def applies(self):
         return isinstance(self.event, SIGNAL_EVENTS) and (
@@ -42,7 +61,7 @@ class BotSignalRule(BaseRule):
         if not user_agent:
             return messages
 
-        result = BotDetector.detect(user_agent)
+        result = BotDetector.detect(user_agent, headers=self.forwarded_headers())
 
         if result.is_bot and not BotDetector.is_allowed_bot(result):
             messages.append(

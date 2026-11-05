@@ -1,17 +1,101 @@
 {
   "codes": {
-    "credit_structuring": {
-      "application": "Figo",
-      "fired": 56,
-      "lift": 13.1,
-      "measured_at": null,
-      "on_fraud": 12,
-      "on_legit": 44,
-      "only_on_fraud": false,
-      "precision": 0.2143,
+    "account_farming:ip": {
+      "application": "Figo replay",
+      "fired": 253,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 253,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
       "window": {
-        "end": "2026-09-19T21:57:10.868878+00:00",
-        "start": "2026-02-01T12:47:28.150450+00:00"
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "adversarial_email_local_part": {
+      "application": "Figo replay",
+      "fired": 24,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 24,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "agent_session": {
+      "application": "Figo replay",
+      "fired": 307,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 307,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "automated_credential_action": {
+      "application": "Figo replay",
+      "fired": 77,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 77,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "block_streak": {
+      "application": "Figo replay",
+      "fired": 271,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 271,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "bot_detected:http_client": {
+      "application": "Figo replay",
+      "fired": 103,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 103,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "credit_structuring": {
+      "application": "Figo replay",
+      "fired": 24,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 0,
+      "on_legit": 9,
+      "only_on_fraud": false,
+      "precision": 0.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
       }
     },
     "crypto_cash_out": {
@@ -28,6 +112,20 @@
         "start": "2026-02-01T12:47:28.150450+00:00"
       }
     },
+    "disposable_email_domain": {
+      "application": "Figo replay",
+      "fired": 391,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 391,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
     "dormant_account_activity": {
       "application": "Figo",
       "fired": 36,
@@ -42,18 +140,74 @@
         "start": "2026-02-01T12:47:28.150450+00:00"
       }
     },
-    "high_failure_rate": {
-      "application": "Figo",
-      "fired": 154,
+    "generated_email_local_part": {
+      "application": "Figo replay",
+      "fired": 212,
       "lift": null,
-      "measured_at": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 174,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "high_failure_rate": {
+      "application": "Figo replay",
+      "fired": 48,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
       "on_fraud": 0,
-      "on_legit": 154,
+      "on_legit": 19,
       "only_on_fraud": false,
       "precision": 0.0,
       "window": {
-        "end": "2026-09-19T21:57:10.868878+00:00",
-        "start": "2026-02-01T12:47:28.150450+00:00"
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "implausible_client_ip": {
+      "application": "Figo replay",
+      "fired": 40,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 40,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "machine_session": {
+      "application": "Figo replay",
+      "fired": 300,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 300,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "multi_accounting:ip": {
+      "application": "Figo replay",
+      "fired": 232,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 232,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
       }
     },
     "new_withdrawal_address": {
@@ -71,31 +225,73 @@
       }
     },
     "pass_through_funds": {
-      "application": "Figo",
-      "fired": 769,
-      "lift": 0.65,
-      "measured_at": null,
-      "on_fraud": 10,
-      "on_legit": 751,
+      "application": "Figo replay",
+      "fired": 215,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 0,
+      "on_legit": 160,
       "only_on_fraud": false,
-      "precision": 0.0131,
+      "precision": 0.0,
       "window": {
-        "end": "2026-09-19T21:57:10.868878+00:00",
-        "start": "2026-02-01T12:47:28.150450+00:00"
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
       }
     },
     "policy_currency_mismatch": {
-      "application": "Figo",
-      "fired": 11868,
-      "lift": 1.0,
-      "measured_at": null,
-      "on_fraud": 235,
-      "on_legit": 11408,
+      "application": "Figo replay",
+      "fired": 4123,
+      "lift": 0.01,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 5,
+      "on_legit": 3148,
       "only_on_fraud": false,
-      "precision": 0.0202,
+      "precision": 0.0016,
       "window": {
-        "end": "2026-09-19T21:57:10.868878+00:00",
-        "start": "2026-02-01T12:47:28.150450+00:00"
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "reserved_email_domain": {
+      "application": "Figo replay",
+      "fired": 25,
+      "lift": null,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 22,
+      "on_legit": 0,
+      "only_on_fraud": true,
+      "precision": 1.0,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "reset_then_login": {
+      "application": "Figo replay",
+      "fired": 48,
+      "lift": 34.57,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 23,
+      "on_legit": 3,
+      "only_on_fraud": false,
+      "precision": 0.8846,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
+      }
+    },
+    "sanctions_screening_unavailable": {
+      "application": "Figo replay",
+      "fired": 27,
+      "lift": 0.26,
+      "measured_at": "2026-11-04T20:10:51.184036+00:00",
+      "on_fraud": 1,
+      "on_legit": 19,
+      "only_on_fraud": false,
+      "precision": 0.05,
+      "window": {
+        "end": "2026-10-22T05:37:12.549016+00:00",
+        "start": "2026-09-15T00:07:29.966396+00:00"
       }
     },
     "velocity_exceeded_per_hour": {

@@ -59,6 +59,16 @@ class EmailPatternRule(BaseRule):
                 )
             )
 
+        if analysis.is_confusable:
+            messages.append(
+                Message(
+                    code="confusable_email_spelling",
+                    path="email",
+                    text="The address mixes alphabets, so it is spelled to look like another",
+                    context=dict(severity=0.7, skeleton=analysis.skeleton, **analysis.context),
+                )
+            )
+
         if analysis.is_adversarial:
             messages.append(
                 Message(

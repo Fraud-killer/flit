@@ -87,7 +87,9 @@ Every detector also declares where it sits on an **evidence ladder** — propose
 - **Rate Limiting** - Per-endpoint, per-user, per-IP throttling with automatic blocking
 - **Replay Attack Protection** - Timestamp validation and nonce-based request deduplication
 - **Request Validation** - Input sanitization, SQL injection prevention, XSS protection
-- **Immutable Audit Logs** - Blockchain-style hash chain for tamper detection
+- **Immutable Audit Logs** - Hash chain over every decision, verified nightly by `verify_audit_chain`
+- **Bounded Decisions** - A latency budget per decision; a rule that hangs or raises is reported as unavailable, never a 500
+- **Written Policy** - Block, review, challenge and allow rules a fraud team writes in plain terms, inherited from the organization, with an application key able to tighten but never loosen
 
 ### Intelligence & Detection
 
@@ -178,6 +180,9 @@ The API will be available at `http://localhost:18000`
 | `FINGERPRINT_SERVER_API_KEY` | Fingerprint server API key (optional second source of device identification) | Optional |
 | `ALLOWED_HOSTS` | JSON array of allowed hosts | `["localhost", "127.0.0.1"]` in debug, `[]` otherwise |
 | `SECURE_SSL_REDIRECT` | Redirect HTTP to HTTPS when not in debug | `true` |
+| `TRUSTED_PROXY_DEPTH` | Proxies that append to `X-Forwarded-For` before FLIT; the client address is the Nth entry from the right | Unset (legacy first-entry reading) |
+| `TRIAGE_ENABLED` | Let a model read the case queue (`manage.py triage`); needs `ANTHROPIC_API_KEY` | `false` |
+| `TRIAGE_MODEL` | The model that reads cases | `claude-opus-5-5` |
 | `GEOIP_DB_PATH` | Directory containing `GeoLite2-ASN.mmdb` and `GeoLite2-Country.mmdb` | Unset (geolocation disabled) |
 | `THREAT_LIST_URL` | Plain-text IP/CIDR blocklist | FireHOL level1 |
 | `DEBUG` | Enable debug mode | `false` |
@@ -246,6 +251,10 @@ Payment rules also read optional payment fields when you send them: `status`, `g
 ```
 
 Every audit is stored, which is what the velocity, account-takeover, historical-score and device-graph checks read. `audit_id` identifies that record, and `device_id` the device FLIT resolved for the event (`null` when no `visit_id` was sent).
+
+Three more fields describe how the decision was reached. `degraded` lists any rule that raised or outlived the decision's latency budget (default 3 s, `Policy.latency_budget_ms`): the decision was made with what arrived, and says so. A control that did not run — sanctions screening, a limit — fails closed and sends the decision to review. `policy_matches` lists the written rules that fired (see *Policy* below). `block_streak` is how many consecutive blocks this origin has now had; the next event from it starts from that.
+
+Two findings sit outside the arithmetic. A sanctions hit is a **hard block**: it does not care about a clean history or a lenient calibration. A control that could not run is a **forced review**: the score is untouched, and a human looks.
 
 ### Collect Device Signals (Browser SDK)
 
@@ -316,6 +325,91 @@ curl -X PATCH "http://localhost:18000/api/v1/applications/{app_id}/cases/{case_i
   -H "Content-Type: application/json" \
   -d '{"status": "confirmed_fraud", "note": "Card testing"}'
 ```
+
+One case per campaign, not per decision. Decisions from one origin — a device, or an address when there is none — in a day land on one case, which counts them (`decision_count`, `campaign_key`, `last_decision_at`). A blocked decision, or an origin blocked three times running, opens or raises the case to `priority: high`; the queue sorts high priority first. Three consecutive blocks from one origin also raise a `campaign_detected` alert on the stream.
+
+### Policy
+
+Decisions a person has already made, applied before the score:
+
+```bash
+curl -X PATCH "http://localhost:18000/api/v1/applications/{app_id}/policy" \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "thresholds": {"block_at": 0.65},
+    "rules": {
+      "block":     [{"subject": "cidr", "pattern": "203.0.113.0/24", "reason": "known actor"}],
+      "challenge": [{"subject": "asn", "pattern": "AS14061"}],
+      "allow":     [{"subject": "client_id", "pattern": "partner-*", "expires_at": "2026-12-31T00:00:00Z"}]
+    },
+    "disabled_rules": ["DeviceExpiredRule"]
+  }'
+```
+
+Subjects: `ip`, `cidr`, `country`, `asn`, `email_root`, `email_domain` (`*.example.com` covers subdomains), `device`, `client_id` (glob), `wallet`, `counterparty`, and `factor` — a rule code the decision produced, so `{"subject": "factor", "pattern": "campaign_motif"}` blocks on a finding. Order of precedence: **block > review > challenge > allow**. A block is a hard block. An allow waives only the review and challenge the *score* asked for; it never overrides a block, and it never silences a control that did not run.
+
+`disabled_rules` switches a rule off for this application without a deploy; every decision records which rules sat out.
+
+**Direction matters.** An application key may make FLIT stricter. Only a signed-in owner of the organization may make it looser — raise a threshold, remove a block rule, add an allow, disable a rule, lower a weight. A loosening from an application key is refused with `policy_loosening_forbidden`, and every change, either way, is written to the audit chain (`policy_updated` or `policy_loosened`).
+
+**Organizations.** A bank with many applications sets the estate's policy once:
+
+```bash
+curl -X PATCH "http://localhost:18000/api/v1/organizations/{org_id}/policy" \
+  -H "Authorization: Bearer {owner_jwt}" \
+  -d '{"rules": {"block": [...]}, "max_block_at": 0.7, "required_enforcement": "enforcing", "disabled_rules": []}'
+```
+
+Every application inherits the organization's rules and cannot remove them; its thresholds are capped at the organization's ceiling; `required_enforcement` makes every application enforce whatever its own setting says. An application may always be stricter than its organization, never looser.
+
+**Calibration rollback.** `python manage.py calibrate --rollback <run_id>` undoes an applied run, restoring every weight it moved. `GET /calibrations` shows the reversal beside the original.
+
+**Rules in shadow.** `shadow_rules` lists rules that run but do not count. Their findings are kept under the decision (`shadow` in the response and in history) and measured by `python manage.py shadow_report --application NAME --days 14`: fires, labelled fraud and legit, precision, lift, and how often the live decision agreed. `--record-evidence` writes the measurement into the evidence ledger, which is how a proposed rule earns the shadow-validated rung against live traffic without acting on anyone. Moving a rule into shadow is a loosening, so an application key cannot do it.
+
+### Webhooks and the Decision Hook
+
+What happens after the response reaches you signed, with retries:
+
+```bash
+curl -X PATCH "http://localhost:18000/api/v1/applications/{app_id}/policy" \
+  -H "Authorization: HMAC-SHA256 {app_id}:{signature}" \
+  -d '{
+    "webhook": {"url": "https://you.example/flit", "secret": "whsec_…", "events": ["case.opened", "campaign.detected"]},
+    "decision_hook": {"url": "https://you.example/decide", "timeout_ms": 150},
+    "challenge_method": "otp"
+  }'
+```
+
+Events: `decision.blocked`, `decision.review`, `case.opened`, `campaign.detected`, `challenge.passed`, `challenge.failed`, `calibration.applied`, `policy.loosened`. Leave `events` out for all of them. Each delivery is a row with backoff (30 s doubling to an hour, eight attempts, then parked as dead), drained by `python manage.py deliver_webhooks`, and carries:
+
+```
+X-Flit-Event:      case.opened
+X-Flit-Delivery:   <delivery id>
+X-Flit-Signature:  t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>
+```
+
+Verify by recomputing the HMAC over `"<t>.<raw body>"` with your secret, comparing in constant time, and refusing a `t` more than five minutes old. URLs must be https and may not point at a private, loopback or link-local address; every outbound call FLIT makes goes through the same guard, and a hostname that resolves inside the network is refused at connection time.
+
+**The decision hook** is your own logic, consulted before a decision is final: FLIT posts the decision it is about to return, your endpoint answers `{"decision": "allow|review|challenge|block", "reason": "…"}`. The vote only goes one way. A hook may turn an allow into a review, a review into a challenge, a challenge into a block; it may not loosen anything, because the hook is reachable with the application key and a leaked key that could whitelist its own traffic is the attacker's dream integration. A hook that times out or errors is recorded on the decision (`hook`) and ignored.
+
+**Engine-issued challenges.** With `challenge_method` set (`otp` or `turnstile`), a decision that asks for a step-up issues the challenge itself and returns it under `challenge` (the OTP code appears there once and is never stored). Verify it as usual, then replay the original event with `challenge_id`; the replayed decision carries `challenge_passed`, waives the step-up and discounts the score. A cleared challenge may be presented three times within fifteen minutes, for the same account, and never moves a hard block. A pass also lands on the actor's identity keys, so their next event in the day sees `recent_challenge_passed` without a challenge id.
+
+**One spelling per identifier.** Account ids, emails and addresses are brought to a canonical form before anything compares them: NFKC with invisible characters removed, `googlemail.com` folded into `gmail.com`, IDNA domains, an IPv4 address written as IPv6 read as the IPv4 address. A local part that mixes alphabets (`pаypal` with a Cyrillic а) is reported as `confusable_email_spelling`.
+
+### A Second Reader for the Queue
+
+With `TRIAGE_ENABLED=true` and an `ANTHROPIC_API_KEY`, a model reads the open cases and proposes a verdict beside the human's:
+
+```bash
+python manage.py triage --application "Figo"            # shadow: propose, store, act on nothing
+python manage.py triage --application "Figo" --report   # how proposals have agreed with reviewers
+python manage.py triage --application "Figo" --apply    # auto-clear, only under the guardrails
+```
+
+The leash is short by design. The model sees **structured facts only**: codes and weights, thirty-day money flow, shared devices, the session's shape, labels on record. Nothing a user typed reaches it: no email local part, no user-agent string, no gateway message, no reviewer note, because those are the channels an attacker controls. It answers a fixed schema (`confirmed_fraud`, `cleared`, `needs_human`, a reason, a one-paragraph `summary` the queue shows), and anything else, a refusal, an error, text that is not the schema, is `needs_human` marked unavailable. A `cleared` verdict is read twice, at low effort then high, and the two must agree; a case where a control fired is never cleared.
+
+Auto-clearing is a separate switch that only opens when the measurement has earned it: at least 50 `cleared` proposals closed by a human at precision 0.99 or better, a daily cap of 200, and a circuit breaker that trips after three auto-cleared cases a reviewer later reopened as fraud (`--reset-breaker` to resume). Clearing is the only verdict FLIT will ever act on by itself.
 
 ### Backtest a Portfolio
 
@@ -452,6 +546,17 @@ Mule accounts are recognised by the shape of money moving through them, not by a
 | `MuleNetworkRule` | Account shares a device with accounts already confirmed fraudulent (`mule_network_device`) | 0.9 |
 
 `MuleNetworkRule` is what the device graph plus your reported outcomes buy together: mules work in sets, and once one is confirmed, the rest of the set becomes visible.
+
+### Session Shape and Agent-Driven Sessions
+
+| Rule | Description | Risk Weight |
+|------|-------------|-------------|
+| `SessionShapeRule` | `machine_session`: one origin's hour reads as automated — many accounts, rotating clients, machine cadence, credentials on accounts it did not create, the takeover motif repeating, rate-limit breaches. `agent_session`: the rhythm of a model driving a loop — bursts of calls issued together separated by think gaps, and refusals answered within seconds by a *different* attempt. `campaign_motif`: the takeover motif on two or more accounts | 0.85 / 0.85 / 0.95 |
+| `BlockStreakRule` | The origin has just been blocked repeatedly; the next variation of a probe does not start from zero | 0.6 |
+
+The agent-shaped signals are what a per-event rule cannot see. A loop driven by a model can rotate its client string and slow its reset-to-login; what it cannot cheaply flatten is that it issues several calls at once and then pauses while the model composes the next step. Known agent client strings (`Claude-User`, `GPTBot`, `ChatGPT-User`, `PerplexityBot`, and so on) are read too, but weighted low: a shell-driven agent sends whatever it types, and the Figo attacker sent `curl` and `python-requests`.
+
+Merchants may forward a small allowlist of the end user's request headers as `headers` (`Accept-Language`, `Accept-Encoding`, `X-Requested-With`, `Sec-CH-UA`, …); the bot detector reads the automation markers among them.
 
 Thresholds default to 80% paid out within an hour, 5 senders a day, 8 credits a day, 60 days of dormancy, and 3 new accounts per device per day. Override them per application on `Policy.mule_thresholds`.
 

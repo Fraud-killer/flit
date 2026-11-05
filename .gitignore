@@ -90,3 +90,7 @@ Skypay records/
 # The evidence ledger is what a measured maturity claim rests on, and the
 # test suite rejects such a claim without it.
 !evidence.json
+
+# Node: only the Railway IaC dev dependency lives at the root (package.json);
+# sdk/node has no dependencies.
+node_modules/

@@ -23,6 +23,30 @@ class BaseEvent(metaclass=ABCMeta):
             setattr(self, attribtute, kwargs.get(attribtute, undefined))
 
         self.extra = dict(item for item in kwargs.items() if item[0] not in self.attributes)
+        self._canonicalize()
+
+    def _canonicalize(self):
+        """
+        Bring the identifiers everything keys on to one spelling.
+
+        An IPv4 address written as IPv6, or an account id with a zero-width
+        space in it, would otherwise be a second identity: a fresh velocity
+        window, a fresh streak, a fresh case. Only valid values are touched;
+        an invalid one is left for `verify` to report.
+        """
+        from core.normalize import normalize_client_id, normalize_ip
+
+        ip_address = getattr(self, "ip_address", undefined)
+        if is_present(ip_address):
+            canonical = normalize_ip(ip_address)
+            if canonical is not None:
+                self.ip_address = canonical
+
+        client_id = getattr(self, "client_id", undefined)
+        if is_present(client_id) and isinstance(client_id, str):
+            canonical = normalize_client_id(client_id)
+            if canonical:
+                self.client_id = canonical
 
     @property
     def account_id(self):

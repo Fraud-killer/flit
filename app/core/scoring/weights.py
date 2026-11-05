@@ -68,6 +68,9 @@ class RiskWeights:
     # ladder, where the tag is collapsed so several tagged signups resolve to
     # one mailbox, not from its weight here.
     plus_tagged_email: float = 0.1
+    # Letters from two alphabets in one address: a Cyrillic а in `pаypal`.
+    # Nobody types that by accident.
+    confusable_email_spelling: float = 0.5
     domain_cannot_receive_mail: float = 0.6
     newly_registered_domain: float = 0.35
     # Crypto rails. An on-chain transfer is final, so the cost of being wrong
@@ -110,8 +113,36 @@ class RiskWeights:
     # The takeover motif — reset, login, then money or manipulation — seen
     # on two or more accounts from one origin. That is the attack itself.
     campaign_motif: float = 0.95
+    # The session has the rhythm of a model driving a loop: bursts of calls
+    # separated by think gaps, refusals answered with a different attempt.
+    agent_session: float = 0.85
+    # Transactions arriving at a pace that will hit the hourly ceiling in
+    # minutes. A warning before the limit, not the limit.
+    velocity_pace: float = 0.45
     # Data completeness, not evidence of fraud: reported, never scored.
     req_event_attrs: float = 0.0
+    # A rule raised or outlived the decision's latency budget. Reported so
+    # the decision says what it did not check; never scored, because the
+    # absence of a finding is not a finding.
+    rule_unavailable: float = 0.0
+    # Decisions a person wrote down (core.decision). A policy block is a
+    # hard block and carries full weight so the recorded score agrees with
+    # the action; the others act through flags, not through the score.
+    policy_block: float = 1.0
+    policy_review: float = 0.0
+    policy_challenge: float = 0.0
+    policy_allow: float = 0.0
+    # The origin has just been blocked, repeatedly. Corroborating by
+    # design: it never decides alone, but it means the next variation of a
+    # probe does not start from zero.
+    block_streak: float = 0.6
+    # A cleared step-up, presented with the replayed decision or read from the
+    # actor's keys. Never scored; it acts through the engine's discount.
+    challenge_passed: float = 0.0
+    recent_challenge_passed: float = 0.0
+    challenge_replay_rejected: float = 0.0
+    # A rule running in shadow: its findings are recorded, never counted.
+    shadow_finding: float = 0.0
 
     # Per-code overrides, used to try candidate weights without touching
     # the defaults (see core.services.simulate_policy).
@@ -213,6 +244,7 @@ class RiskWeights:
             "generated_email_local_part": self.generated_email_local_part,
             "adversarial_email_local_part": self.adversarial_email_local_part,
             "plus_tagged_email": self.plus_tagged_email,
+            "confusable_email_spelling": self.confusable_email_spelling,
             "domain_cannot_receive_mail": self.domain_cannot_receive_mail,
             "newly_registered_domain": self.newly_registered_domain,
             "crypto_cash_out": self.crypto_cash_out,
@@ -229,7 +261,19 @@ class RiskWeights:
             "credential_reset_storm": self.credential_reset_storm,
             "machine_session": self.machine_session,
             "campaign_motif": self.campaign_motif,
+            "agent_session": self.agent_session,
+            "velocity_pace": self.velocity_pace,
             "req_event_attrs": self.req_event_attrs,
+            "rule_unavailable": self.rule_unavailable,
+            "policy_block": self.policy_block,
+            "policy_review": self.policy_review,
+            "policy_challenge": self.policy_challenge,
+            "policy_allow": self.policy_allow,
+            "block_streak": self.block_streak,
+            "challenge_passed": self.challenge_passed,
+            "recent_challenge_passed": self.recent_challenge_passed,
+            "challenge_replay_rejected": self.challenge_replay_rejected,
+            "shadow_finding": self.shadow_finding,
         }
         if rule_code in weight_map:
             return weight_map[rule_code]

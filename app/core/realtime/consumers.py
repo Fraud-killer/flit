@@ -1,9 +1,22 @@
-import json
+"""
+The alert stream, one tenant at a time.
+
+A websocket client sees the alerts of the applications it has proved it may
+see, and nothing else. Proof is the application's secret key, or a signed-in
+user who owns the organization. There is no shared channel a client lands on
+by connecting: an alert about one merchant's customer is that merchant's
+data, and a stream every connection could read would hand every tenant's
+decisions to anyone who found the URL.
+"""
+
+import hmac
 import logging
 from typing import Optional
-from channels.generic.websocket import AsyncJsonWebsocketConsumer
+
 from channels.db import database_sync_to_async
-from core.models import Application
+from channels.generic.websocket import AsyncJsonWebsocketConsumer
+
+from core.models import Application, Organization
 from core.realtime.alerts import AlertManager
 
 
@@ -20,7 +33,9 @@ class AlertConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         await self.accept()
 
-        await self.subscribe_to_channel(AlertManager.get_channel_name())
+        # Staff see the firehose; everyone else subscribes to what they own.
+        if self.is_staff:
+            await self.subscribe_to_channel(AlertManager.get_channel_name())
 
         await self.send_json({
             "type": "connection.established",
@@ -90,6 +105,14 @@ class AlertConsumer(AsyncJsonWebsocketConsumer):
             })
             return
 
+        is_valid = await self.validate_organization_access(organization_id)
+        if not is_valid:
+            await self.send_json({
+                "type": "error",
+                "message": "Not authorised for this organization",
+            })
+            return
+
         channel = AlertManager.get_organization_channel(organization_id)
         await self.subscribe_to_channel(channel)
         self.organization_id = organization_id
@@ -141,17 +164,54 @@ class AlertConsumer(AsyncJsonWebsocketConsumer):
             "alert": alert,
         })
 
+    # -- Who is on the other end -------------------------------------------
+
+    @property
+    def user(self):
+        """The signed-in user, if the ASGI auth stack found a session."""
+        user = self.scope.get("user")
+        return user if user is not None and getattr(user, "is_authenticated", False) else None
+
+    @property
+    def is_staff(self):
+        user = self.user
+        return bool(user and getattr(user, "is_staff", False))
+
     @database_sync_to_async
     def validate_application_access(self, application_id: str, api_key: Optional[str]) -> bool:
+        """
+        The application's secret key, or a signed-in owner of its
+        organization. Nothing else: an application id is not a secret, it is
+        in every request path.
+        """
         try:
             application = Application.objects.filter(id=application_id).first()
             if not application:
                 return False
 
             if api_key:
-                return application.raw_secret_key == api_key
+                expected = application.raw_secret_key or ""
+                return hmac.compare_digest(str(expected), str(api_key))
 
-            return True
+            return self._owns(application.organization)
         except Exception as e:
             logger.error(f"Error validating application access: {e}")
             return False
+
+    @database_sync_to_async
+    def validate_organization_access(self, organization_id: str) -> bool:
+        try:
+            organization = Organization.objects.filter(id=organization_id).first()
+            if not organization:
+                return False
+
+            return self._owns(organization)
+        except Exception as e:
+            logger.error(f"Error validating organization access: {e}")
+            return False
+
+    def _owns(self, organization) -> bool:
+        user = self.user
+        if not user:
+            return False
+        return self.is_staff or organization.owner_id == user.id

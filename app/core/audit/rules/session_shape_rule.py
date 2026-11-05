@@ -33,8 +33,12 @@ class SessionShapeRule(BaseRule, LockCache):
 
     techniques = ("F1002", "F1006", "T1585")
     kind = RuleKind.DETECTION
-    maturity = Maturity.SYNTHETIC_TESTED
+    # Backtested on the Figo export (2026-09-15 to 2026-10-22, 952 labelled
+    # fraud events): machine_session fired 300 times and agent_session 307,
+    # every one on labelled fraud. The numbers are in the evidence ledger.
+    maturity = Maturity.BACKTESTED
     provenance = "tests/unit/test_session_scoring.py::TestEvasiveReplay"
+    evidence_codes = ("machine_session", "agent_session")
 
     # Below this many events in the window there is no shape to read.
     MIN_EVENTS = 4
@@ -50,7 +54,21 @@ class SessionShapeRule(BaseRule, LockCache):
         machine_cadence=0.3,
         others_credentials=0.4,
         takeover_motif=0.5,
+        # The agent-shaped signals. Bursts separated by think gaps, and
+        # refusals answered with a different attempt, are the rhythm of a
+        # model driving a loop. The client string is the weakest of the
+        # three, because a shell-driven agent sends whatever it types.
+        bimodal_cadence=0.35,
+        adaptive_retry=0.4,
+        agent_client=0.2,
+        # The origin has been hitting the rate limiter: it is probing faster
+        # than the API allows, which no customer does.
+        rate_limited=0.3,
     )
+
+    # Signals that, when present, mark the session as agent-driven rather
+    # than merely scripted.
+    AGENT_SIGNALS = ("bimodal_cadence", "adaptive_retry")
 
     @property
     def applies(self):
@@ -70,6 +88,8 @@ class SessionShapeRule(BaseRule, LockCache):
             user_agent=event_value(self.event, "user_agent"),
             category=AuditRecorder.category(self.event),
             risk_score=None,
+            blocked=None,
+            outcome=AuditRecorder.outcome(self.event),
         )
 
     @lockcache(key="session")
@@ -129,6 +149,27 @@ class SessionShapeRule(BaseRule, LockCache):
         elif features["takeover_motifs"] == 1 and features["credential_motifs"] >= 2:
             found["takeover_motif"] = 0.7
 
+        # Bursts, then silence, then bursts. Judged against how much
+        # batching this merchant's own traffic shows.
+        burst_p95 = baseline.get("burst_ratio_p95")
+        if burst_p95 is None:
+            burst_p95 = SessionBaseline.DEFAULTS["burst_ratio_p95"]
+        if (
+            features["events"] >= 6
+            and features["burst_ratio"] >= max(0.3, burst_p95 + 0.1)
+            and features["think_gaps"] >= 2
+        ):
+            found["bimodal_cadence"] = min(1.0, 0.7 + 0.1 * (features["think_gaps"] - 2))
+
+        if features["adaptive_retries"] >= 2:
+            found["adaptive_retry"] = min(1.0, 0.6 + 0.2 * (features["adaptive_retries"] - 2))
+
+        if features["agent_clients"] >= 1:
+            found["agent_client"] = 1.0
+
+        if features["rate_limited"] >= 1:
+            found["rate_limited"] = min(1.0, 0.6 + 0.2 * (features["rate_limited"] - 1))
+
         return found
 
     @classmethod
@@ -167,8 +208,31 @@ class SessionShapeRule(BaseRule, LockCache):
                     features=features,
                     baseline={
                         key: baseline.get(key)
-                        for key in ("accounts_p95", "client_families_p95", "median_gap_p05", "sessions")
+                        for key in ("accounts_p95", "client_families_p95", "median_gap_p05", "burst_ratio_p95", "sessions")
                     },
+                ),
+            ))
+
+        # Reported separately from `machine_session` so the two can be
+        # measured apart: a script and an agent are both machines, but only
+        # one of them is reading the refusals.
+        agent_signals = {name: signals[name] for name in self.AGENT_SIGNALS if name in signals}
+        if agent_signals:
+            messages.append(Message(
+                code="agent_session",
+                path=session.origin["key"] if session.origin else "ip_address",
+                text=(
+                    f"Session from this {session.origin['key']} looks agent-driven: "
+                    + ", ".join(sorted(agent_signals))
+                ),
+                context=dict(
+                    severity=min(1.0, max(agent_signals.values())),
+                    origin=session.origin,
+                    signals={name: round(strength, 2) for name, strength in agent_signals.items()},
+                    burst_ratio=features["burst_ratio"],
+                    think_gaps=features["think_gaps"],
+                    adaptive_retries=features["adaptive_retries"],
+                    agent_clients=features["agent_clients"],
                 ),
             ))
 

@@ -1,4 +1,5 @@
 from http import HTTPMethod
+from django.db.models import F
 from django.utils import timezone
 from core.audit.auditor import Auditor
 from asgiref.sync import async_to_sync
@@ -19,6 +20,8 @@ from core.services.simulate_policy import SimulatePolicy
 from api.parsers import parse_decision_filters, parse_case_inputs, parse_simulation_inputs
 from api.parsers import parse_challenge_inputs, parse_challenge_verification
 from api.parsers import parse_calibration_inputs
+from api.parsers import parse_policy_inputs
+from core.messages.policies import msg_policy_loosening
 from api.serializers.case_serializers import serialize_case
 from api.serializers.challenge_serializers import serialize_challenge
 from core.services.publish_outcome import PublishOutcome
@@ -219,6 +222,12 @@ class ApplicationViewSet(ViewSet):
         if status_filter != "all":
             cases = cases.filter(status=status_filter)
 
+        # High priority first; within a priority the campaign that moved most
+        # recently, so a live attack sits at the top of the queue.
+        cases = cases.order_by(
+            Case.PRIORITY_ORDER, F("last_decision_at").desc(nulls_last=True), "-opened_at",
+        )
+
         total = cases.count()
         page = cases[inputs.offset:inputs.offset + inputs.limit]
 
@@ -287,6 +296,40 @@ class ApplicationViewSet(ViewSet):
             application=inputs.application, days=inputs.days, apply=inputs.apply,
         )
         return build_api_response(data=serialize_run(run))
+
+    @action(
+        detail=True,
+        methods=[HTTPMethod.GET, HTTPMethod.PATCH],
+        url_path=r"policy",
+    )
+    def policy(self, request, pk):
+        """
+        GET: the policy in force — thresholds, weights, rules, disabled rules,
+        latency budget — and the organization's ceiling over it.
+        PATCH: change any of those. A change that makes FLIT looser is
+        refused unless a signed-in owner of the organization makes it; an
+        application key may only tighten. Every change is written to the
+        audit chain.
+        """
+        from core.services.policy_change import PolicyChange, PolicyLooseningForbidden
+
+        inputs, errors = parse_policy_inputs(pk, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+
+        if request.method == HTTPMethod.PATCH:
+            try:
+                PolicyChange.apply(
+                    policy=inputs.application.policy, changes=inputs.changes, actor=request.auth,
+                )
+            except PolicyLooseningForbidden as refusal:
+                return build_api_response(
+                    errors=[msg_policy_loosening.new(context=dict(loosened=refusal.loosened))],
+                    status_code=403,
+                )
+
+        return build_api_response(data=PolicyChange.describe(inputs.application))
 
     @action(
         detail=True,

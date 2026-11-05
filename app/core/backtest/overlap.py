@@ -19,6 +19,7 @@ def compare(first, second):
         applications=[first.name, second.name],
         devices=overlap_devices(first, second),
         counterparties=overlap_counterparties(first, second),
+        cards=overlap_cards(first, second),
         ip_addresses=overlap_ips(first, second),
         fraud_known_elsewhere=fraud_known_elsewhere(first, second),
     )
@@ -50,6 +51,17 @@ def overlap_ips(first, second):
     right = values(second, "ip_address")
 
     return summarize(left, right)
+
+
+def overlap_cards(first, second):
+    """
+    The identifier that crosses merchants in card data: the same card paying
+    two different businesses.
+    """
+    return summarize(
+        context_values(first, "card_fingerprint"),
+        context_values(second, "card_fingerprint"),
+    )
 
 
 def overlap_counterparties(first, second):
@@ -116,7 +128,7 @@ def format_overlap(result):
     first, second = result["applications"]
     add(f"Overlap: {first} vs {second}")
 
-    for name in ("devices", "counterparties", "ip_addresses"):
+    for name in ("devices", "cards", "counterparties", "ip_addresses"):
         entry = result[name]
         add(f"  {name:<15} {entry['first']:>7} / {entry['second']:>7} shared {entry['shared']:>7} "
             f"({percent(entry['share_of_first'])} of the first)")

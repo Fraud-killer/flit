@@ -1,7 +1,7 @@
+import re
 import requests
 from devkit.struct import Struct
 from kernel.config import Config
-from aiohttp import ClientSession, ClientTimeout
 
 
 class FetchVisitData:
@@ -9,14 +9,25 @@ class FetchVisitData:
     server_api_key = Config.fingerprint_server_api_key
     timeout_seconds = 5
 
+    # A Fingerprint request id is an opaque token. Anything else — a slash,
+    # a query string, a dot-dot — is a merchant-supplied value trying to
+    # change which URL FLIT fetches, and gets no request at all.
+    REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{1,128}")
+
+    @classmethod
+    def valid_request_id(cls, request_id):
+        return isinstance(request_id, str) and cls.REQUEST_ID.fullmatch(request_id) is not None
+
     @classmethod
     def call(cls, request_id):
+        if not cls.valid_request_id(request_id): return None
         visit_data = cls.make_request(request_id)
         if visit_data is None: return None
         return cls.normalize_visit_data(visit_data)
 
     @classmethod
     async def async_call(cls, request_id):
+        if not cls.valid_request_id(request_id): return None
         visit_data = await cls.async_make_request(request_id)
         if visit_data is None: return None
         return cls.normalize_visit_data(visit_data)
@@ -42,24 +53,22 @@ class FetchVisitData:
 
     @classmethod
     async def async_make_request(cls, request_id):
+        from core.outbound import fetch_json
+
         url = f"{cls.server_api_url}/events/{request_id}"
 
         headers = {
             "accept": "application/json",
             "content-type": "application/json",
-            "auth-api-key": cls.server_api_key,
+            "auth-api-key": cls.server_api_key or "",
         }
 
-        timeout = ClientTimeout(total=cls.timeout_seconds)
+        body = await fetch_json(url, headers=headers, timeout=cls.timeout_seconds)
 
-        async with ClientSession(timeout=timeout) as session:
-            async with session.get(url, headers=headers) as response:
-                if response.status == 404:
-                    return None
+        if not isinstance(body, dict) or "products" not in body:
+            return None
 
-                response.raise_for_status()
-
-                return (await response.json())["products"]
+        return body["products"]
 
     @classmethod
     def normalize_visit_data(cls, visit_data):

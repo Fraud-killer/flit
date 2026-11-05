@@ -70,6 +70,9 @@ class SanctionedAddressRule(BaseRule):
                     list_loaded_at=status.get("loaded_at"),
                     list_count=status.get("count"),
                     severity=1.0,
+                    # Not weighed against a clean history or a calibrated
+                    # threshold: the counterparty is listed or it is not.
+                    hard_block=True,
                 ),
             )
 
@@ -83,7 +86,10 @@ class SanctionedAddressRule(BaseRule):
                     "No sanctions list is loaded, so this address was not "
                     "screened. Run: python manage.py refresh_sanctions"
                 ),
-                context=dict(score=0.0),
+                # Not scored, so the risk arithmetic is untouched; but the
+                # decision goes to review, because a control that did not run
+                # is not a pass.
+                context=dict(score=0.0, force_review=True),
             )
 
         if status["stale"]:

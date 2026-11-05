@@ -31,6 +31,10 @@ class VelocityCheckRule(BaseRule, LockCache):
         "failed_transactions_per_hour": 10,
     }
 
+    # Share of the hourly limit, seen within five minutes, that counts as
+    # pacing toward it.
+    PACE_SHARE = 0.5
+
     @property
     def applies(self):
         return isinstance(self.event, TransactionEvent)
@@ -176,6 +180,28 @@ class VelocityCheckRule(BaseRule, LockCache):
                     "window": "1 hour",
                 },
                 text="High transaction failure rate detected",
+            ))
+
+        # The pace, before the ceiling. Half the hourly allowance inside five
+        # minutes will hit the limit in ten; saying so now is cheaper than
+        # saying it then.
+        hourly_limit = thresholds["transactions_per_hour"]
+        five_minute_count = five_min_data.get("transaction_count", 0)
+        if (
+            hourly_limit > 0
+            and five_minute_count >= max(3, hourly_limit * self.PACE_SHARE)
+            and hour_data.get("transaction_count", 0) <= hourly_limit
+        ):
+            messages.append(Message(
+                code="velocity_pace",
+                path="transaction",
+                context={
+                    "count_5_minutes": five_minute_count,
+                    "hourly_limit": hourly_limit,
+                    "share_of_hourly_limit": round(five_minute_count / hourly_limit, 2),
+                    "window": "5 minutes",
+                },
+                text="Transaction pace would exceed the hourly limit within minutes",
             ))
 
         day_data = velocity_data.get("24_hours", {})

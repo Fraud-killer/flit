@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 from django.utils import timezone
-from django.db import transaction
+from django.db import connection, transaction
 
 from core.audit.models import AuditLog, AuditLogLevel, AuditLogCategory
 
@@ -13,10 +13,22 @@ logger = logging.getLogger(__name__)
 class AuditLogger:
     @classmethod
     def _get_last_hash(cls, application_id: Optional[UUID] = None) -> Optional[str]:
-        queryset = AuditLog.objects.order_by("-timestamp")
+        """
+        The hash the next row chains to, read under lock.
+
+        Two decisions for one application landing at once used to read the
+        same tail and both chain to it, forking the chain; the verifier then
+        reports a break that nobody caused. Called inside `log`'s
+        transaction, the row lock holds until the new row is written. On a
+        database without row locks (SQLite) this is a plain read.
+        """
+        queryset = AuditLog.objects.order_by("-timestamp", "-id")
         if application_id:
             queryset = queryset.filter(application_id=application_id)
-        
+
+        if connection.features.has_select_for_update:
+            queryset = queryset.select_for_update()
+
         last_entry = queryset.first()
         return last_entry.entry_hash if last_entry else None
 

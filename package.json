@@ -1,0 +1,8 @@
+{
+  "name": "flit-railway",
+  "private": true,
+  "description": "Dev dependency for the Railway Infrastructure-as-Code file in .railway/railway.ts. Not part of the application.",
+  "devDependencies": {
+    "railway": "^3.16.0"
+  }
+}

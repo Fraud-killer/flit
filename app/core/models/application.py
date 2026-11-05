@@ -67,6 +67,20 @@ class Application(models.Model):
         max_length=20, choices=Enforcement.CHOICES, default=Enforcement.SHADOW,
     )
 
+    # Where FLIT tells the merchant what happened after the response: cases,
+    # challenge outcomes, campaigns, calibrations. Signed with webhook_secret
+    # (encrypted at rest). webhook_events narrows the set; empty means all.
+    # See core.outbound.webhooks.
+    webhook_url = models.URLField(max_length=500, null=True, blank=True)
+    webhook_secret = models.CharField(max_length=512, null=True, blank=True)
+    webhook_events = models.JSONField(default=list, blank=True)
+
+    # A merchant endpoint consulted before each decision is final. It may
+    # tighten the decision, never loosen it, and a timeout is ignored. See
+    # core.outbound.decision_hook.
+    decision_hook_url = models.URLField(max_length=500, null=True, blank=True)
+    decision_hook_timeout_ms = models.IntegerField(default=150)
+
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -82,6 +96,10 @@ class Application(models.Model):
     @property
     def raw_visit_sdk_key(self):
         return mcrypt.decrypt(self.visit_sdk_key)
+
+    @property
+    def raw_webhook_secret(self):
+        return mcrypt.decrypt(self.webhook_secret) if self.webhook_secret else None
 
     @property
     def raw_turnstile_secret(self):

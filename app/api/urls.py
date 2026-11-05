@@ -12,6 +12,7 @@ router = SimpleRouter()
 router.trailing_slash = "/?"
 
 router.register("applications", views.ApplicationViewSet, basename="applications")
+router.register("organizations", views.OrganizationViewSet, basename="organizations")
 
 version_one_routes = [
     path("collect", views.CollectView.as_view(), name="collect"),

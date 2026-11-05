@@ -30,7 +30,22 @@ class BotDetectionResult:
 
 
 class BotDetector:
+    # Clients that are a language model with a browser or a shell. Listed
+    # across vendors on purpose: the thing being detected is a class of
+    # client, not a company. Weak evidence on its own — the shell-driven ones
+    # send whatever string the model types — and read mainly by the session
+    # scorer, where the cadence tells the rest.
+    AGENT_CLIENT_PATTERNS = [
+        r"claude-user", r"claude-code", r"claudebot", r"anthropic",
+        r"chatgpt-user", r"gptbot", r"oai-searchbot", r"openai",
+        r"perplexitybot", r"perplexity-user", r"google-extended", r"gemini",
+        r"ccbot", r"cohere-ai", r"bytespider", r"amazonbot", r"applebot-extended",
+        r"meta-externalagent", r"browser-use", r"agent-sdk", r"langchain",
+        r"llamaindex", r"crewai", r"autogen", r"computer-use",
+    ]
+
     KNOWN_BOT_PATTERNS = [
+        *[(pattern, "agent") for pattern in AGENT_CLIENT_PATTERNS],
         (r"googlebot", "search_crawler"),
         (r"bingbot", "search_crawler"),
         (r"yandexbot", "search_crawler"),
@@ -203,6 +218,44 @@ class BotDetector:
         import json
         content = json.dumps(fingerprint_data, sort_keys=True)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
+
+    # What kind of thing is on the other end, coarsely.
+    CLIENT_CLASSES = {
+        "agent": "agent",
+        "http_client": "http_library",
+        "scraper": "automation",
+        "headless_browser": "automation",
+        "automation": "automation",
+        "search_crawler": "crawler",
+        "social_crawler": "crawler",
+        "generic_bot": "crawler",
+    }
+
+    @classmethod
+    def client_class(cls, user_agent: Optional[str]) -> str:
+        """
+        browser | http_library | automation | agent | crawler | unknown.
+
+        `unknown` is an absent or degenerate user agent. Anything that is not
+        a recognised tool and looks like a browser string is `browser`.
+        """
+        if not user_agent or not user_agent.strip():
+            return "unknown"
+
+        lowered = user_agent.lower()
+
+        for pattern, bot_type in cls.KNOWN_BOT_PATTERNS:
+            if re.search(pattern, lowered):
+                return cls.CLIENT_CLASSES.get(bot_type, "automation")
+
+        for pattern in cls.SUSPICIOUS_UA_PATTERNS:
+            if re.match(pattern, user_agent):
+                return "unknown"
+
+        if lowered.startswith("mozilla/") or "/" in lowered and "(" in lowered:
+            return "browser"
+
+        return "unknown"
 
     @classmethod
     def is_allowed_bot(cls, result: BotDetectionResult) -> bool:

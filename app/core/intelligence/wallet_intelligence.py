@@ -126,7 +126,6 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-import aiohttp
 from django.core.cache import cache
 
 from kernel.config import Config
@@ -188,14 +187,16 @@ def rpc_url_for(chain):
 
 
 async def _rpc(url, method, params):
-    payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
-    timeout = aiohttp.ClientTimeout(total=RPC_TIMEOUT_SECONDS)
+    from core.outbound import fetch_json
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.post(url, json=payload) as reply:
-            if reply.status != 200:
-                return None
-            body = await reply.json(content_type=None)
+    payload = {"jsonrpc": "2.0", "id": 1, "method": method, "params": params}
+
+    # RPC URLs come from configuration, but through the guard regardless:
+    # a misconfigured CHAIN_RPC_URLS pointing inside the network should fail
+    # loudly in the log, not quietly succeed.
+    body = await fetch_json(
+        url, method="POST", json_body=payload, timeout=RPC_TIMEOUT_SECONDS,
+    )
 
     if not isinstance(body, dict) or body.get("error"):
         return None

@@ -23,6 +23,11 @@ DOT_INSENSITIVE_DOMAINS = {
     "googlemail.com",
 }
 
+# Domains that are one mailbox provider under two names.
+DOMAIN_ALIASES = {
+    "googlemail.com": "gmail.com",
+}
+
 # Domains that hand out throwaway inboxes. Deliberately short and high
 # confidence — the heuristics below carry the long tail, and a false positive
 # here blocks a real signup.
@@ -114,6 +119,10 @@ class EmailAnalysis:
     epoch_at: Optional[datetime] = None
     digit_ratio: float = 0.0
     is_adversarial: bool = False
+    # Letters from two scripts in one local part, or a local part whose
+    # skeleton differs from its spelling: written to look like something else.
+    is_confusable: bool = False
+    skeleton: str = ""
 
     signals: List[str] = field(default_factory=list)
     context: Dict = field(default_factory=dict)
@@ -127,14 +136,31 @@ class EmailAnalysis:
 
 
 def _split(email: str):
+    """
+    (local, domain), both canonical, or (None, None).
+
+    Canonical means NFKC with invisible characters removed, lower-cased, the
+    domain IDNA-encoded, and one name per provider: `googlemail.com` is
+    `gmail.com`. A fullwidth letter or a zero-width space in an address is
+    a second identity for an attacker and nothing for a customer.
+    """
+    from core.normalize import UnstableValue, normalize_domain, normalize_text
+
     if not email or not isinstance(email, str):
         return None, None
 
-    candidate = email.strip().lower()
+    try:
+        candidate = normalize_text(email, casefold=True, collapse_spaces=False).strip()
+    except UnstableValue:
+        return None, None
+
     if candidate.count("@") != 1:
         return None, None
 
     local, domain = candidate.split("@")
+    domain = normalize_domain(domain) or ""
+    domain = DOMAIN_ALIASES.get(domain, domain)
+
     if not local or not domain or "." not in domain:
         return None, None
 
@@ -258,12 +284,20 @@ def analyze(email: str) -> EmailAnalysis:
     if result.is_adversarial:
         result.signals.append("adversarial_local_part")
 
+    from core.normalize import is_mixed_script, skeleton
+
+    result.skeleton = skeleton(local) or ""
+    result.is_confusable = is_mixed_script(local) or is_mixed_script(domain)
+    if result.is_confusable:
+        result.signals.append("confusable_spelling")
+
     result.context = dict(
         domain=domain,
         root_preview=redact(result.root) if result.root else "",
         digit_ratio=round(result.digit_ratio, 2),
         plus_tag=result.plus_tag,
         epoch_at=result.epoch_at.isoformat() if result.epoch_at else None,
+        confusable=result.is_confusable,
     )
 
     return result

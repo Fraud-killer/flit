@@ -154,12 +154,70 @@ class Calibrator:
             run.applied = True
             run.applied_at = timezone.now()
             run.reason = f"Applied {len(accepted)} weight change(s)."
+
+            from core.outbound import Webhooks
+            Webhooks.enqueue(application, "calibration.applied", dict(
+                run_id=str(run.id),
+                changes=[dict(code=p["code"], **{"from": p["from"], "to": p["to"]}) for p in accepted],
+                before=run.before, after=run.after,
+            ))
         else:
             run.mode = CalibrationMode.DRY_RUN
             run.reason = f"{len(accepted)} proposal(s) pass the guardrails; not applied (dry run)."
 
         run.save()
         return run
+
+    @classmethod
+    def rollback(cls, run):
+        """
+        Undo one applied run: every weight it moved goes back to where it
+        moved it from. Recorded as a run of its own, so the ledger shows the
+        reversal next to the change.
+        """
+        if run.mode != CalibrationMode.APPLIED or not run.applied:
+            raise ValueError(f"Run {run.id} was not applied; nothing to roll back")
+
+        policy = run.application.policy
+        weights = dict((policy.calibration or {}).get("weights") or {})
+        reverted = []
+
+        for proposal in run.accepted:
+            code, previous = proposal["code"], proposal["from"]
+            if weights.get(code) == proposal["to"]:
+                if previous is None or previous == DEFAULT_WEIGHTS.get_weight(code, default=None):
+                    weights.pop(code, None)
+                else:
+                    weights[code] = previous
+                reverted.append(dict(
+                    code=code, **{"from": proposal["to"], "to": previous},
+                    direction="rollback", reason=f"restored from run {run.id}",
+                ))
+
+        policy.calibration = dict(
+            policy.calibration or {},
+            weights=weights,
+            calibrated_at=timezone.now().isoformat(),
+            run_id=str(run.id),
+            rolled_back_run_id=str(run.id),
+        )
+        policy.save(update_fields=["calibration", "updated_at"])
+
+        reversal = CalibrationRun.objects.create(
+            application=run.application, window_days=run.window_days,
+            decisions=run.decisions, labelled=run.labelled, fraud=run.fraud, legit=run.legit,
+            mode=CalibrationMode.ROLLED_BACK,
+            reason=f"Rolled back run {run.id}: {len(reverted)} weight(s) restored.",
+            proposals=[dict(p, accepted=True) for p in reverted],
+            before=run.after, after=run.before,
+            applied=True, applied_at=timezone.now(),
+        )
+
+        run.mode = CalibrationMode.ROLLED_BACK
+        run.reason = (run.reason + " " if run.reason else "") + f"Rolled back by {reversal.id}."
+        run.save(update_fields=["mode", "reason"])
+
+        return reversal
 
     # -- loading and measuring -------------------------------------------
 

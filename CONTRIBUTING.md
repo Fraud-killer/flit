@@ -122,28 +122,74 @@ pytest --cov=app tests/
 
 ### Adding New Fraud Rules
 
-FLIT's power comes from its extensible rule system. To add a new rule:
+A rule is one piece of reasoning about an event. Beyond the logic, every rule
+declares what it is for and how much it has been shown to work; those
+declarations generate `COVERAGE.md`, and the test suite rejects a rule that
+claims more evidence than it has.
 
-1. Create a new file in `app/core/audit/rules/`
-2. Extend `BaseRule` class
-3. Implement the `_evaluate` method
-4. Register the rule in `app/core/audit/rules/__init__.py`
-5. Add the rule to `Auditor.rule_classes` in `app/core/audit/auditor.py`
-6. Write unit tests in `tests/unit/test_fraud_rules.py`
+1. Create a file in `app/core/audit/rules/` and extend `BaseRule`.
+2. Declare `techniques` (MITRE F3 ids), `kind`, `maturity` and `provenance`.
+3. Implement the `applies` property and `async perform()`, which returns a
+   `Message`, a list of them, or `None`.
+4. Export it from `app/core/audit/rules/__init__.py` and add it to
+   `Auditor.rule_classes` in `app/core/audit/auditor.py`. That tuple is the
+   registry: nothing else needs to know the rule exists.
+5. Give its code a weight in `app/core/scoring/weights.py`, or attach
+   `score=` to the message and the engine uses that as the fallback weight.
+6. Write tests, then regenerate the matrix and check it in:
+   `python manage.py coverage_matrix --out ../COVERAGE.md --json ../coverage.json`.
 
-Example:
 ```python
-from .base_rule import BaseRule
+from devkit.message import Message
+from core.audit.events import TransactionEvent
 
-class MyNewRule(BaseRule):
-    code = "my_new_rule"
-    weight = 0.7  # 0.0 to 1.0
-    
-    async def _evaluate(self, event, policy):
-        # Your detection logic here
-        if suspicious_condition:
-            self.add_message("Suspicious activity detected", score=0.8)
+from .base_rule import BaseRule, Maturity, RuleKind
+
+
+class RoundAmountRule(BaseRule):
+    """Debits that are suspiciously round, in the style of a test payment."""
+
+    techniques = ("F1002",)
+    kind = RuleKind.DETECTION
+    # PROPOSED until a test proves it; SYNTHETIC_TESTED needs `provenance`
+    # to name the test; BACKTESTED and above need `evidence_codes` in the
+    # evidence ledger. The suite enforces each step.
+    maturity = Maturity.SYNTHETIC_TESTED
+    provenance = "tests/unit/test_round_amount.py::TestRoundAmountRule"
+
+    @property
+    def applies(self):
+        return isinstance(self.event, TransactionEvent) and self.event.type == "debit"
+
+    async def perform(self):
+        if float(self.event.amount) % 100 == 0:
+            return Message(
+                code="round_amount",
+                path="amount",
+                text="Debit is a round hundred",
+                # `severity` grades this instance 0–1; `score` is the fallback
+                # weight when weights.py has no entry for the code.
+                context=dict(severity=0.6, score=0.3),
+            )
+        return None
 ```
+
+Three more things a rule can say:
+
+- **`kind`.** `DETECTION` detects a technique and counts toward coverage.
+  `CONTROL` enforces a limit the merchant set or the law requires (AML
+  ceilings, sanctions); it is not evidence of fraud. `CORROBORATION` is
+  evidence about the actor rather than the technique.
+- **`on_failure`.** What the decision does when the rule raises or outlives
+  the latency budget. Left unset, a `CONTROL` fails closed (the decision goes
+  to review because the check did not happen) and everything else fails open
+  (its findings are simply missing). Set `FailMode.CLOSED` on a detection
+  whose silence should never pass unnoticed.
+- **Decision flags in the message context.** `hard_block=True` blocks
+  regardless of weights, history or calibration (a sanctions hit).
+  `force_review=True` sends the decision to a human without touching the
+  score (a control that could not run). Use them for findings that are not
+  evidence to be weighed.
 
 ## Community
 

@@ -26,7 +26,8 @@ class AuditRecorder:
     """
 
     @classmethod
-    async def record(cls, *, event, policy, scope, risk_result, rule_names):
+    async def record(cls, *, event, policy, scope, risk_result, rule_names, degraded=None,
+                     disabled=None, campaign_key=None, streak=None, shadow=None, hook=None):
         try:
             return await sync_to_async(cls.write)(
                 event=event,
@@ -34,6 +35,12 @@ class AuditRecorder:
                 scope=scope,
                 risk_result=risk_result,
                 rule_names=rule_names,
+                degraded=degraded,
+                disabled=disabled,
+                campaign_key=campaign_key,
+                streak=streak,
+                shadow=shadow,
+                hook=hook,
             )
         except Exception:
             # Losing one history row is better than failing the decision.
@@ -41,28 +48,89 @@ class AuditRecorder:
             return None
 
     @classmethod
-    def write(cls, *, event, policy, scope, risk_result, rule_names):
+    def write(cls, *, event, policy, scope, risk_result, rule_names, degraded=None,
+              disabled=None, campaign_key=None, streak=None, shadow=None, hook=None):
         audit_log = cls.write_log(
             event=event,
             policy=policy,
             scope=scope,
             risk_result=risk_result,
             rule_names=rule_names,
+            degraded=degraded,
+            disabled=disabled,
+            streak=streak,
+            shadow=shadow,
+            hook=hook,
         )
 
         if risk_result.should_review:
-            cls.open_case(audit_log, policy.application)
+            cls.open_case(
+                audit_log, policy.application,
+                campaign_key=campaign_key,
+                priority=cls.priority(risk_result, streak),
+            )
 
         return audit_log
 
-    @classmethod
-    def open_case(cls, audit_log, application):
-        from core.models import Case
+    @staticmethod
+    def priority(risk_result, streak=None):
+        from core.models import CasePriority
 
-        return Case.objects.create(audit_log=audit_log, application=application)
+        critical = risk_result.level.value == "critical" or risk_result.should_block
+        campaign = (streak or {}).get("consecutive", 0) >= 3
+        return CasePriority.HIGH if critical or campaign else CasePriority.NORMAL
 
     @classmethod
-    def write_log(cls, *, event, policy, scope, risk_result, rule_names):
+    def open_case(cls, audit_log, application, *, campaign_key=None, priority=None):
+        """
+        One case per campaign. A decision from an origin that already has an
+        open case in the window lands on that case and is counted there,
+        instead of opening a new one for the reviewer to find and merge.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        from core.models import Case, CasePriority, CaseStatus
+
+        priority = priority or CasePriority.NORMAL
+        now = timezone.now()
+
+        if campaign_key:
+            existing = (
+                Case.objects
+                .filter(
+                    application=application,
+                    status=CaseStatus.OPEN,
+                    campaign_key=campaign_key,
+                    opened_at__gte=now - timedelta(hours=Case.CAMPAIGN_WINDOW_HOURS),
+                )
+                .order_by("-opened_at")
+                .first()
+            )
+            if existing is not None:
+                existing.decision_count += 1
+                existing.last_decision_at = now
+                if CasePriority.ORDER[priority] < CasePriority.ORDER[existing.priority]:
+                    existing.priority = priority
+                existing.save(update_fields=["decision_count", "last_decision_at", "priority"])
+                return existing
+
+        case = Case.objects.create(
+            audit_log=audit_log, application=application,
+            campaign_key=campaign_key, priority=priority, last_decision_at=now,
+        )
+
+        from core.outbound import Webhooks
+        Webhooks.enqueue(application, "case.opened", dict(
+            case_id=str(case.id), audit_id=str(audit_log.id), client_id=audit_log.actor_id,
+            priority=priority, campaign_key=campaign_key, risk_score=audit_log.risk_score,
+            factors=audit_log.risk_factors,
+        ))
+
+        return case
+
+    @classmethod
+    def write_log(cls, *, event, policy, scope, risk_result, rule_names, degraded=None,
+                  disabled=None, streak=None, shadow=None, hook=None):
         application = policy.application
         identity = scope.device_identity
 
@@ -82,7 +150,7 @@ class AuditRecorder:
             risk_score=risk_result.total_score,
             risk_factors=[factor.code for factor in risk_result.factors],
             outcome=cls.outcome(event),
-            context=dict(
+            context=cls.cap(dict(
                 visit_id=cls.value(event, "visit_id"),
                 device_id=str(identity.id) if identity else None,
                 # Credential actions: what was done and how the credential
@@ -109,9 +177,19 @@ class AuditRecorder:
                 # enforcing one would, or measuring it later is meaningless.
                 should_block=risk_result.should_block,
                 should_challenge=risk_result.should_challenge,
+                should_review=risk_result.should_review,
                 enforcement=getattr(application, "enforcement", "shadow"),
                 coverage=risk_result.coverage,
                 rules=rule_names,
+                # Rules that did not run, so a later reader knows this
+                # decision was made on less than the full set.
+                degraded=degraded or [],
+                disabled_rules=disabled or [],
+                block_streak=(streak or {}).get("consecutive", 0),
+                # Findings of rules in shadow, kept apart from the live ones.
+                shadow=[dict(rule=f["rule"], code=f["code"]) for f in (shadow or [])],
+                # What the merchant's decision hook said and whether it applied.
+                hook=hook,
                 # The global identity keys this decision touched. Kept so that
                 # labelling it later — a case confirmed, a chargeback
                 # reported — can attribute that outcome back to them without
@@ -126,7 +204,7 @@ class AuditRecorder:
                     dict(code=factor.code, weight=factor.weight, score=factor.score)
                     for factor in risk_result.factors
                 ],
-            ),
+            )),
         )
 
     @staticmethod
@@ -142,6 +220,39 @@ class AuditRecorder:
         return wallet_intelligence.address_key(
             address, AuditRecorder.value(event, "chain"),
         )
+
+    # No single value in a decision's context may exceed this. A provider
+    # response or browser detail blob the size of a web page is kept as a
+    # preview and a digest, not as the row.
+    MAX_CONTEXT_VALUE_CHARS = 4000
+
+    @classmethod
+    def cap(cls, context):
+        """Oversized strings become a preview plus a digest of the whole."""
+        import hashlib
+        import json
+
+        capped = {}
+        for key, value in context.items():
+            if isinstance(value, str) and len(value) > cls.MAX_CONTEXT_VALUE_CHARS:
+                capped[key] = dict(
+                    truncated=True, length=len(value),
+                    sha256=hashlib.sha256(value.encode("utf-8")).hexdigest(),
+                    preview=value[:cls.MAX_CONTEXT_VALUE_CHARS // 4],
+                )
+            elif isinstance(value, (dict, list)):
+                encoded = json.dumps(value, default=str)
+                if len(encoded) > cls.MAX_CONTEXT_VALUE_CHARS * 4:
+                    capped[key] = dict(
+                        truncated=True, length=len(encoded),
+                        sha256=hashlib.sha256(encoded.encode("utf-8")).hexdigest(),
+                        preview=encoded[:cls.MAX_CONTEXT_VALUE_CHARS // 4],
+                    )
+                else:
+                    capped[key] = value
+            else:
+                capped[key] = value
+        return capped
 
     @staticmethod
     def value(event, name):

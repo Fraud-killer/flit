@@ -22,6 +22,7 @@ channels = "*"
 channels-redis = "*"
 geoip2 = "*"
 redis = "*"
+anthropic = "*"
 
 [dev-packages]
 pytest = "*"

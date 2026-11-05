@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone as datetime_timezone
 from typing import List, Optional
 
-import aiohttp
 from django.core.cache import cache
 
 from kernel.config import Config
@@ -81,14 +80,16 @@ class DomainInfo:
         )
 
 
-async def _get_json(url, *, params=None, headers=None):
-    timeout = aiohttp.ClientTimeout(total=LOOKUP_TIMEOUT_SECONDS)
+async def _get_json(url, *, params=None, headers=None, max_redirects=0):
+    # Through the SSRF guard: the domain in the RDAP path came from a user's
+    # email address, and rdap.org answers with a redirect to wherever the
+    # registry lives. Each hop is judged before it is dialled.
+    from core.outbound import fetch_json
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(url, params=params, headers=headers) as reply:
-            if reply.status != 200:
-                return None
-            return await reply.json(content_type=None)
+    return await fetch_json(
+        url, params=params, headers=headers,
+        timeout=LOOKUP_TIMEOUT_SECONDS, max_redirects=max_redirects,
+    )
 
 
 async def _mx_records(domain):
@@ -118,7 +119,7 @@ async def _mx_records(domain):
 
 async def _registration_date(domain):
     """When a domain was registered, over RDAP, or None if unknown."""
-    body = await _get_json(RDAP_URL.format(domain=domain))
+    body = await _get_json(RDAP_URL.format(domain=domain), max_redirects=3)
 
     if not body:
         return None

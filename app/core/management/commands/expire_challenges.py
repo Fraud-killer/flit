@@ -29,6 +29,16 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        from core.services.job_lock import JobLock, JobLocked
+
+        try:
+            with JobLock.hold("expire_challenges"):
+                return self.run(*args, **options)
+        except JobLocked as held:
+            self.stdout.write(self.style.WARNING(f"Skipped: {held}"))
+            return
+
+    def run(self, *args, **options):
         application = None
         name = options.get("application")
 

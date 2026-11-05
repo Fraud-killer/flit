@@ -69,6 +69,10 @@ class Challenge(models.Model):
     attempts = models.PositiveIntegerField(default=0)
     max_attempts = models.PositiveIntegerField(default=DEFAULT_MAX_ATTEMPTS)
 
+    # How many decisions have been replayed with this challenge once it
+    # passed. Bounded, so one puzzle does not buy an hour of free requests.
+    replays = models.PositiveIntegerField(default=0)
+
     # The identity keys resolved for the decision that asked for this
     # challenge, so its outcome can be attributed without re-resolving them.
     identity_key_ids = models.JSONField(default=list, blank=True)

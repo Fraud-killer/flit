@@ -24,6 +24,10 @@ class Command(BaseCommand):
         target = parser.add_mutually_exclusive_group(required=True)
         target.add_argument("--application", help="Application name")
         target.add_argument("--all", action="store_true", help="Every application")
+        target.add_argument(
+            "--rollback", metavar="RUN_ID",
+            help="Undo an applied run: restore the weights it moved",
+        )
         parser.add_argument(
             "--days", type=int, default=Calibrator.WINDOW_DAYS,
             help=f"How much labelled history to learn from (default {Calibrator.WINDOW_DAYS})",
@@ -34,6 +38,29 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        from core.services.job_lock import JobLock, JobLocked
+
+        try:
+            with JobLock.hold("calibrate"):
+                return self.run(*args, **options)
+        except JobLocked as held:
+            self.stdout.write(self.style.WARNING(f"Skipped: {held}"))
+            return
+
+    def run(self, *args, **options):
+        if options["rollback"]:
+            from core.models import CalibrationRun
+
+            run = CalibrationRun.objects.filter(id=options["rollback"]).first()
+            if not run:
+                raise CommandError(f"No calibration run {options['rollback']}")
+            try:
+                reversal = Calibrator.rollback(run)
+            except ValueError as error:
+                raise CommandError(str(error))
+            self.stdout.write(format_run(reversal))
+            return
+
         if options["all"]:
             applications = list(Application.objects.order_by("name"))
         else:

@@ -106,12 +106,44 @@ class RateLimiter:
         cache.delete(block_key)
 
     @classmethod
+    def client_ip(cls, request) -> str:
+        """
+        The end client's address, as far as FLIT can trust it.
+
+        X-Forwarded-For is a list the client starts and each proxy appends
+        to. Only the entries written by proxies FLIT knows about are
+        trustworthy: with TRUSTED_PROXY_DEPTH set to N, that is the Nth from
+        the right. Depth 0 means no proxy, so the socket address is the
+        client. Unset keeps the legacy first-entry reading.
+        """
+        remote = request.META.get("REMOTE_ADDR", "unknown")
+        forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+        depth = cls.trusted_proxy_depth()
+
+        if depth == 0 or not forwarded:
+            return remote
+
+        entries = [entry.strip() for entry in forwarded.split(",") if entry.strip()]
+        if not entries:
+            return remote
+
+        if depth is None:
+            return entries[0]
+
+        return entries[-depth] if len(entries) >= depth else entries[0]
+
+    @staticmethod
+    def trusted_proxy_depth():
+        from kernel.config import Config
+
+        try:
+            return Config.trusted_proxy_depth
+        except Exception:
+            return None
+
+    @classmethod
     def get_client_identifier(cls, request) -> str:
-        x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
-        if x_forwarded_for:
-            ip = x_forwarded_for.split(",")[0].strip()
-        else:
-            ip = request.META.get("REMOTE_ADDR", "unknown")
+        ip = cls.client_ip(request)
 
         user_agent = request.META.get("HTTP_USER_AGENT", "")
         fingerprint = request.headers.get("X-Device-Fingerprint", "")

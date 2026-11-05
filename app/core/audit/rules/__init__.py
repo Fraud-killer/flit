@@ -53,3 +53,6 @@ from .automated_credential_action_rule import AutomatedCredentialActionRule as A
 from .credential_reset_storm_rule import CredentialResetStormRule as CredentialResetStormRule
 
 from .session_shape_rule import SessionShapeRule as SessionShapeRule
+
+from .block_streak_rule import BlockStreakRule as BlockStreakRule
+from .challenge_passed_rule import ChallengePassedRule as ChallengePassedRule

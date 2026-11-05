@@ -25,6 +25,25 @@ class RuleKind:
     VALUES = (DETECTION, CONTROL, CORROBORATION)
 
 
+class FailMode:
+    """
+    What a rule's silence means when it could not run.
+
+    A detection that times out has found nothing, and nothing is what the
+    decision records. A control that times out has not checked, and a
+    compliance check that quietly did not happen is worse than one that is
+    absent — so its failure is a reason to look, not a pass.
+    """
+
+    # The rule's findings are simply missing from this decision.
+    OPEN = "open"
+
+    # The decision is sent to review because the rule did not run.
+    CLOSED = "closed"
+
+    VALUES = (OPEN, CLOSED)
+
+
 class RuleError(Exception):
     pass
 
@@ -64,6 +83,12 @@ class BaseRule(metaclass=ABCMeta):
     # evidence ledger or the test suite rejects the claim.
     evidence_codes = ()
 
+    # What happens to the decision when this rule raises or outlives the
+    # decision's latency budget. None means "decide by kind": a CONTROL
+    # fails closed, everything else fails open. Set it explicitly on a rule
+    # whose kind does not tell the whole story.
+    on_failure = None
+
     def __init__(self, *, event, scope, policy):
         self.event = event
         self.scope = scope
@@ -74,6 +99,12 @@ class BaseRule(metaclass=ABCMeta):
     @abstractmethod
     def applies(self):
         pass
+
+    @classmethod
+    def fail_mode(cls):
+        if cls.on_failure in FailMode.VALUES:
+            return cls.on_failure
+        return FailMode.CLOSED if cls.kind == RuleKind.CONTROL else FailMode.OPEN
 
     @abstractmethod
     async def perform(self):

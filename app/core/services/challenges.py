@@ -160,12 +160,27 @@ class VerifyChallenge:
     async def _resolve(cls, challenge, status, outcome):
         await sync_to_async(cls._save_resolution)(challenge, status)
 
+        # The application is read on a thread: a challenge loaded without it
+        # cached would otherwise turn into a synchronous query from here.
+        application = await sync_to_async(lambda: challenge.application)()
+
         if challenge.identity_key_ids:
             await NetworkReputation.record_async(
                 identity_key_ids=challenge.identity_key_ids,
-                application=challenge.application,
+                application=application,
                 outcome=outcome,
             )
+
+        from core.outbound import Webhooks
+        await sync_to_async(Webhooks.enqueue)(
+            application,
+            "challenge.passed" if outcome == "challenge_passed" else "challenge.failed",
+            dict(
+                challenge_id=str(challenge.id), client_id=challenge.client_id,
+                method=challenge.method, status=status,
+                audit_id=str(challenge.audit_log_id) if challenge.audit_log_id else None,
+            ),
+        )
 
     @staticmethod
     def _save_resolution(challenge, status):
@@ -205,6 +220,12 @@ class ExpireChallenges:
                     application=challenge.application,
                     outcome="challenge_failed",
                 )
+
+            from core.outbound import Webhooks
+            Webhooks.enqueue(challenge.application, "challenge.failed", dict(
+                challenge_id=str(challenge.id), client_id=challenge.client_id,
+                method=challenge.method, status=ChallengeStatus.EXPIRED,
+            ))
 
             expired += 1
 

@@ -15,3 +15,4 @@ from .parse_challenge_inputs import parse_challenge_inputs as parse_challenge_in
 from .parse_challenge_verification import (
     parse_challenge_verification as parse_challenge_verification
 )
+from .parse_policy_inputs import parse_policy_inputs as parse_policy_inputs

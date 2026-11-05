@@ -38,6 +38,8 @@ MANIPULATION_ACTIONS = ("password_change", "email_change", "phone_change", "two_
 CREDENTIAL_ACTIONS = RESET_ACTIONS + LOGIN_ACTIONS + MANIPULATION_ACTIONS
 DEBIT_ACTION = "transaction_debit"
 REGISTRATION_ACTION = "registration"
+# Written by the security middleware when an origin hits a rate limit.
+RATE_LIMITED_ACTION = "rate_limited"
 
 
 def client_family(user_agent):
@@ -71,6 +73,7 @@ class SessionProfile:
 
     @staticmethod
     def summarize(log):
+        context = log.context or {}
         return dict(
             timestamp=log.timestamp,
             action=log.action,
@@ -78,7 +81,70 @@ class SessionProfile:
             user_agent=log.user_agent,
             category=log.category,
             risk_score=log.risk_score,
+            # What the decision did with this event, so the session can see
+            # the loop react to it.
+            blocked=context.get("should_block"),
+            outcome=log.outcome,
         )
+
+    # Seconds. Below BURST events are one burst — issued together, not one
+    # after another by a person. Between THINK_MIN and THINK_MAX after a burst
+    # is a think gap: a model composing its next move.
+    BURST_SECONDS = 1.0
+    THINK_MIN_SECONDS = 2.0
+    THINK_MAX_SECONDS = 45.0
+    # How soon after a refusal a different attempt counts as adaptation.
+    ADAPT_SECONDS = 45.0
+
+    def cadence(self):
+        """
+        The shape of the timing: how much of it is bursts, and how many
+        think gaps follow a burst.
+
+        A person clicks one thing, reads, clicks the next. A script fires at
+        a steady rate. An agent does neither: it issues several calls at once,
+        then nothing for seconds while the model composes the next step, then
+        another cluster. That bimodal rhythm is the one thing a loop driven by
+        a model cannot cheaply flatten, because the gaps are the model.
+        """
+        gaps = self.gaps()
+        if not gaps:
+            return dict(burst_ratio=0.0, think_gaps=0)
+
+        bursts = sum(1 for gap in gaps if gap < self.BURST_SECONDS)
+        think_gaps = 0
+        in_burst = False
+
+        for gap in gaps:
+            if gap < self.BURST_SECONDS:
+                in_burst = True
+            else:
+                if in_burst and self.THINK_MIN_SECONDS <= gap <= self.THINK_MAX_SECONDS:
+                    think_gaps += 1
+                in_burst = False
+
+        return dict(burst_ratio=round(bursts / len(gaps), 3), think_gaps=think_gaps)
+
+    def adaptive_retries(self):
+        """
+        Refusals followed, within seconds, by a *different* attempt.
+
+        A person who is blocked tries the same thing again, or gives up. A
+        loop that is blocked reads the refusal and changes something: the
+        account, the action, the client. Counted as pairs of (refused event,
+        different event soon after) from the same origin.
+        """
+        count = 0
+        for earlier, later in zip(self.events, self.events[1:]):
+            refused = earlier.get("blocked") is True or earlier.get("outcome") == "failure"
+            if not refused:
+                continue
+            delay = (later["timestamp"] - earlier["timestamp"]).total_seconds()
+            if delay > self.ADAPT_SECONDS:
+                continue
+            if later["action"] != earlier["action"] or later["actor_id"] != earlier["actor_id"]:
+                count += 1
+        return count
 
     def gaps(self):
         """Seconds between consecutive events."""
@@ -142,7 +208,20 @@ class SessionProfile:
             spread = statistics.pstdev(gaps) / statistics.mean(gaps)
             regularity = round(max(0.0, 1.0 - spread), 3)
 
+        cadence = self.cadence()
+
+        from core.intelligence.bot_detection import BotDetector
+        agent_clients = sum(
+            1 for event in self.events
+            if BotDetector.client_class(event["user_agent"]) == "agent"
+        )
+
         return dict(
+            burst_ratio=cadence["burst_ratio"],
+            think_gaps=cadence["think_gaps"],
+            adaptive_retries=self.adaptive_retries(),
+            agent_clients=agent_clients,
+            rate_limited=sum(1 for event in self.events if event["action"] == RATE_LIMITED_ACTION),
             events=len(self.events),
             accounts=len(accounts),
             client_families=len(families),
@@ -223,6 +302,9 @@ class SessionBaseline:
         client_families_p95=1,
         events_p95=20,
         median_gap_p05=20.0,
+        # A merchant's own batching SDK can issue calls together; this is
+        # how much of that is ordinary before it reads as an agent.
+        burst_ratio_p95=0.1,
         sessions=0,
     )
 
@@ -271,6 +353,8 @@ class SessionBaseline:
                 user_agent=row["user_agent"],
                 category=None,
                 risk_score=None,
+                blocked=None,
+                outcome=None,
             ))
 
         if len(sessions) < cls.MIN_SESSIONS:
@@ -288,6 +372,7 @@ class SessionBaseline:
             client_families_p95=cls.percentile([p["client_families"] for p in profiles], 95),
             events_p95=cls.percentile([p["events"] for p in profiles], 95),
             median_gap_p05=cls.percentile(gaps, 5) if gaps else cls.DEFAULTS["median_gap_p05"],
+            burst_ratio_p95=cls.percentile([p["burst_ratio"] for p in profiles], 95),
             sessions=len(profiles),
         )
 

@@ -1,5 +1,10 @@
 device_validity_days = 90
 
+# Milliseconds the rules may take together before the decision is made with
+# what has arrived. Wide enough for the network lookups some rules make;
+# narrow enough that a hung dependency cannot hold a payment open.
+latency_budget_ms = 3000
+
 aml_cft_limit="NGN 5,000,000.00"
 
 

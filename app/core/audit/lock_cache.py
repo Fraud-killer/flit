@@ -2,6 +2,13 @@ import asyncio
 
 
 def lockcache(key=None):
+    """
+    Memoise an async method on the instance, once per distinct key.
+
+    `key` is a string, or a callable given the method's own arguments that
+    returns the cache key for that call. Two calls that compute the same key
+    share one result and one lock; different keys are independent.
+    """
     def decorator(handler):
         ikey = (
             handler.__name__
@@ -13,19 +20,23 @@ def lockcache(key=None):
     return decorator
 
 
-def get_runner(instance, key, handler, lock_dict, cache_dict):
-    lock_dict[key] = asyncio.Lock()
-
+def get_runner(instance, name, key, handler, lock_dict, cache_dict):
     async def runner(*args, **kwargs):
-        if key in cache_dict:
-            return cache_dict[key]
+        # Namespaced by method so two methods keyed on the same value (a
+        # visit id, say) never read each other's result.
+        ckey = (name, key(*args, **kwargs) if callable(key) else key)
 
-        async with lock_dict[key]:
-            if key in cache_dict:
-                return cache_dict[key]
+        if ckey in cache_dict:
+            return cache_dict[ckey]
+
+        lock = lock_dict.setdefault(ckey, asyncio.Lock())
+
+        async with lock:
+            if ckey in cache_dict:
+                return cache_dict[ckey]
 
             result = await handler(instance, *args, **kwargs)
-            cache_dict[key] = result
+            cache_dict[ckey] = result
 
             return result
 
@@ -36,20 +47,18 @@ class LockCache:
      def __new__(cls, *args, **kwargs):
         decorated = dict()
 
-        for name, value in cls.__dict__.items():
-            if not (
-                isinstance(value, tuple)
-                and len(value) > 0
-                and value[0] == "%lockcache%"
-            ):
-                continue
+        for klass in cls.__mro__:
+            for name, value in vars(klass).items():
+                if name in decorated:
+                    continue
+                if not (
+                    isinstance(value, tuple)
+                    and len(value) == 3
+                    and value[0] == "%lockcache%"
+                ):
+                    continue
 
-            # TODO: Length of value must be three (3)
-            # TODO: Index (1) must be dense string (key)
-            # TODO: Index (2) must be a coroutine (handler)
-            # TODO: Ensure index (2) is indeed instance-bound
-
-            decorated[name] = (value[1], value[2])
+                decorated[name] = (value[1], value[2])
 
         lock_dict = dict()
         cache_dict = dict()
@@ -59,6 +68,7 @@ class LockCache:
         for name, (key, handler) in decorated.items():
             runner = get_runner(
                 instance,
+                name,
                 key,
                 handler,
                 lock_dict,
