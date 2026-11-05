@@ -166,31 +166,6 @@ class Config(metaclass=ConfigMeta):
         return ctx.load.env("TRIAGE_MODEL", "claude-opus-5-5")
 
     @variable
-    def agent_enabled(self, ctx):
-        """
-        Agent FLIT: the analyst's agent on top of the decision engine. Off by
-        default. When off, no investigation runs and the API reports it.
-        """
-        value = ctx.load.env("AGENT_ENABLED", False)
-        value, error = execute(to_bool, value)
-        if not error: return value
-        raise VariableError(msg_to_bool.text)
-
-    @variable
-    def agent_model(self, ctx):
-        return ctx.load.env("AGENT_MODEL", "claude-opus-5-5")
-
-    @variable
-    def agent_verifier_model(self, ctx):
-        """The second, independent reader of a finding. Same model by default."""
-        return ctx.load.env("AGENT_VERIFIER_MODEL", None)
-
-    @variable
-    def agent_default_mode(self, ctx):
-        """propose, ask or auto. The ceiling for new agent policies."""
-        return ctx.load.env("AGENT_DEFAULT_MODE", "propose")
-
-    @variable
     def redis_url(self, ctx):
         return ctx.load.env("REDIS_URL", "redis://localhost:6379/0")
 
