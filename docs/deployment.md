@@ -65,7 +65,7 @@ service) while that is sorted out.
 
 ## Scheduled jobs
 
-Six matter. Each is its own cron service in `.railway/railway.ts`, built from
+Eight matter. Each is its own cron service in `.railway/railway.ts`, built from
 the same image as the API:
 
 ```bash
@@ -75,7 +75,16 @@ python manage.py refresh_sanctions              # daily 03:30 UTC — alert on f
 python manage.py refresh_threat_intel           # hourly at :15 — Tor exits and IP blocklist into the cache
 python manage.py calibrate --all --apply        # nightly 02:00 UTC — learn from outcomes
 python manage.py verify_audit_chain             # nightly 04:00 UTC — exits non-zero on a break
+python manage.py run_monitors                   # every 5 minutes — Agent FLIT monitors (no-op while the agent is off)
+python manage.py run_investigations --limit 10  # every 5 minutes — drains queued investigations (no-op while the agent is off)
 ```
+
+The last two cost nothing while `AGENT_ENABLED` is off. With it on, a queued
+investigation (from the API, a case, a monitor, or an answered approval) waits
+up to five minutes for the next pass; when that is too slow for your
+reviewers, run `run_investigations --loop` as an always-on service instead
+and drop the cron. Both take the job lock, so two workers never run the same
+investigation.
 
 Five minutes is Railway's floor between cron runs, so a webhook is delivered
 within five minutes of the decision plus the row's own backoff, not within one.
@@ -132,6 +141,16 @@ python manage.py calibrate --rollback <run_id>
 
 Every weight the run moved goes back to where it moved it from, and the
 reversal is its own `CalibrationRun` row next to the original.
+
+## Agent FLIT
+
+Off by default. To turn it on: set `AGENT_ENABLED=true` and `ANTHROPIC_API_KEY`
+on the API service and on the `run-investigations` and `run-monitors`
+services. Every application's agent policy starts in `propose` mode; the
+order to loosen it, and why, is in `docs/agent.md` ("Turning it on, in
+order"). Watch the `agent_action` and `agent_investigation_*` rows on the audit
+chain the way you watch policy changes; `agent_policy_loosened` is the one
+that matters.
 
 ## Behind a load balancer
 

@@ -213,6 +213,20 @@ The four moves, each built on something already here:
 | **Probes the merchant** | Assumes the application is sound and the user is the problem | A FLIT agent that walks the merchant's API in staging, continuously, mapped to F3 — a fourth coverage column: *is the merchant exposed* | F3 taxonomy, coverage matrix, the Gh0stAnts and October findings as the first test set |
 | **Shares in real time** | Nightly sync, k-anonymity floor | An actor seen at one merchant is challenged on sight at the next, in minutes | `NetworkReputationRule`, shared identity keys |
 
+**Agent FLIT** — *first cut built 2026-11-05.* The four moves need an operator
+who is cheaper than the attacker too. Agent FLIT is the analyst's agent on top
+of the engine: it works a case, an account or an origin under a playbook the
+team wrote, with the engine's own read services as tools; it files a typed
+report whose findings cite their evidence and are re-read by an independent
+verifier; its few writes (close a case, add a time-limited block rule, tighten
+policy, open a monitor, remember a fact) go through deny > ask > allow across
+organization, application and playbook, then the bank's own hook, and wait for
+a person whenever anything is undecided. It never enforces; the engine does.
+It starts by proposing and earns `ask`, then `auto`, by agreeing with the cases
+people closed. It is not a SIEM and will not become one: its subject is money
+moving, its evidence is the decision log, and every claim it makes traces to a
+tool call. `docs/agent.md`; `app/core/agent/`.
+
 And one principle that follows from all four: **enforcement has to be cheaper
 than detection.** Blocking tells the loop which variation failed. Step-ups
 that cost wall-clock time — a delayed reset email, a liveness check on a

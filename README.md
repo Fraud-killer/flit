@@ -183,6 +183,9 @@ The API will be available at `http://localhost:18000`
 | `TRUSTED_PROXY_DEPTH` | Proxies that append to `X-Forwarded-For` before FLIT; the client address is the Nth entry from the right | Unset (legacy first-entry reading) |
 | `TRIAGE_ENABLED` | Let a model read the case queue (`manage.py triage`); needs `ANTHROPIC_API_KEY` | `false` |
 | `TRIAGE_MODEL` | The model that reads cases | `claude-opus-5-5` |
+| `AGENT_ENABLED` | Switch on Agent FLIT, the analyst's agent (see `docs/agent.md`); needs `ANTHROPIC_API_KEY` | `false` |
+| `AGENT_MODEL` | The investigating model | `claude-opus-5-5` |
+| `AGENT_VERIFIER_MODEL` | The independent reader of findings | same as `AGENT_MODEL` |
 | `GEOIP_DB_PATH` | Directory containing `GeoLite2-ASN.mmdb` and `GeoLite2-Country.mmdb` | Unset (geolocation disabled) |
 | `THREAT_LIST_URL` | Plain-text IP/CIDR blocklist | FireHOL level1 |
 | `DEBUG` | Enable debug mode | `false` |
@@ -425,6 +428,19 @@ python manage.py triage --application "Figo" --apply    # auto-clear, only under
 The leash is short by design. The model sees **structured facts only**: codes and weights, thirty-day money flow, shared devices, the session's shape, labels on record. Nothing a user typed reaches it: no email local part, no user-agent string, no gateway message, no reviewer note, because those are the channels an attacker controls. It answers a fixed schema (`confirmed_fraud`, `cleared`, `needs_human`, a reason, a one-paragraph `summary` the queue shows), and anything else, a refusal, an error, text that is not the schema, is `needs_human` marked unavailable. A `cleared` verdict is read twice, at low effort then high, and the two must agree; a case where a control fired is never cleared.
 
 Auto-clearing is a separate switch that only opens when the measurement has earned it: at least 50 `cleared` proposals closed by a human at precision 0.99 or better, a daily cap of 200, and a circuit breaker that trips after three auto-cleared cases a reviewer later reopened as fraud (`--reset-breaker` to resume). Clearing is the only verdict FLIT will ever act on by itself.
+
+### Agent FLIT
+
+The analyst's agent on top of the engine. Point it at a case, an account or an origin and it works the playbook: reads the account, the device, the session, the network, the policy; reaches a verdict; files a typed report whose findings cite the tool calls behind them, each re-read by an independent verifier. It never enforces. Its few writes (close a case, add a time-limited block rule, tighten policy, open a monitor, remember a fact) go through a permission ladder (deny > ask > allow, organization over application over playbook), then your own hook, then, in auto mode, a classifier; anything undecided waits for a person in the console. Every step is on the audit chain.
+
+```bash
+POST /api/v1/applications/{id}/investigations      {"case_id": "..."}             # or client_id / ip_address / device_id, playbook
+GET  /api/v1/applications/{id}/investigations/{iid}                                # steps, report, pending approvals
+PATCH /api/v1/applications/{id}/investigations/{iid}/steps/{sid}  {"decision": "approve"}   # a signed-in person
+PATCH /api/v1/applications/{id}/agent-policy       {"mode": "ask", "deny": ["policy_change"], "allow": ["case_note"]}
+```
+
+It starts in `propose` mode and earns the rest: `ask` when you are ready to answer it, `auto` only for a playbook measured at 90% agreement with the cases your team closed. Playbooks are markdown your team writes; memories are facts your team confirms. `docs/agent.md` has the whole design.
 
 ### Backtest a Portfolio
 

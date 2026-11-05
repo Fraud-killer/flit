@@ -191,6 +191,29 @@ Three more things a rule can say:
   score (a control that could not run). Use them for findings that are not
   evidence to be weighed.
 
+### Adding an Agent Tool
+
+Agent FLIT's tools live in `app/core/agent/tools/`. A tool is a class with a
+`name`, a `description` the model reads, a JSON `input_schema`, a `kind`
+(`read` or `write`), a `subject(inputs)` that returns the one string
+permission rules match, and `run(inputs, context)` that calls an existing
+service and returns a JSON-serialisable dict. Register it in the tuple in
+`tools/__init__.py`. Then:
+
+- Pass the output through `sanitize()`; never return a string a user typed
+  (user agents, emails, gateway text, notes). Identity goes in as shape.
+- A write also implements `describe(inputs)`, the sentence a person reads when
+  asked to approve it, and sets `needs_verification = True` if it should be
+  read by the verifier before running unattended.
+- A write reuses a console service (`PolicyChange`, `Case.resolve`), so the
+  loosening guard and the audit chain apply to the agent as they do to a person.
+- Add it to `tests/unit/test_agent_loop.py`: what it returns, what the ladder
+  does with it in each mode, and that it never loosens.
+
+Playbooks are markdown with a frontmatter in `app/core/agent/playbooks/`
+(`docs/agent.md` has the fields). A built-in playbook is a brief, not a
+procedure: say what to establish and what counts as an ordinary explanation.
+
 ## Community
 
 - **Discussions**: Use GitHub Discussions for questions and ideas

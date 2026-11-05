@@ -1,6 +1,6 @@
 // Railway infrastructure for FLIT, applied with `railway config plan` and
 // `railway config apply` (see docs/deployment.md). This file is the whole
-// project: the API, its Postgres and Redis, and the six scheduled jobs.
+// project: the API, its Postgres and Redis, and the eight scheduled jobs.
 //
 // Secrets are never written here. SECRET_KEY and MCRYPT_KEY are read from
 // the shell when the file is applied (FLIT_SECRET_KEY, FLIT_MCRYPT_KEY) and
@@ -118,6 +118,10 @@ export default defineRailway(() => {
     // Exits non-zero when a row has been edited or the chain broken. The
     // chain only proves anything if this runs; wire the exit to an alert.
     job("verify-audit-chain", "verify_audit_chain", "0 4 * * *"),
+    // Agent FLIT. Both exit at once while AGENT_ENABLED is off. With it on,
+    // set AGENT_ENABLED and ANTHROPIC_API_KEY on these two services too.
+    job("run-monitors", "run_monitors", "*/5 * * * *"),
+    job("run-investigations", "run_investigations --limit 10", "*/5 * * * *"),
   ];
 
   return project("flit", {

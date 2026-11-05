@@ -31,3 +31,19 @@ from core.audit.models import AuditLogArchive as AuditLogArchive
 
 from .webhook import WebhookDelivery as WebhookDelivery
 from .webhook import WebhookStatus as WebhookStatus
+
+from .agent import AgentMode as AgentMode
+from .agent import AgentPolicy as AgentPolicy
+from .agent import Investigation as Investigation
+from .agent import InvestigationStatus as InvestigationStatus
+from .agent import InvestigationTrigger as InvestigationTrigger
+from .agent import InvestigationStep as InvestigationStep
+from .agent import StepKind as StepKind
+from .agent import StepStatus as StepStatus
+from .agent import AgentMemory as AgentMemory
+from .agent import MemoryKind as MemoryKind
+from .agent import Monitor as Monitor
+from .agent import MonitorStatus as MonitorStatus
+from .agent import MonitorMetric as MonitorMetric
+from .agent import MonitorAction as MonitorAction
+from .agent import Playbook as Playbook

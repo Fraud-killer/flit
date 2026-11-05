@@ -1,3 +1,5 @@
 from .application_view_set import ApplicationViewSet as ApplicationViewSet
 from .collect_view import CollectView as CollectView
 from .organization_view_set import OrganizationViewSet as OrganizationViewSet
+from .agent_view_set import ApplicationAgentViewSet as ApplicationAgentViewSet
+from .agent_view_set import OrganizationAgentViewSet as OrganizationAgentViewSet

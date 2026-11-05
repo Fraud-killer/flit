@@ -13,6 +13,9 @@ router.trailing_slash = "/?"
 
 router.register("applications", views.ApplicationViewSet, basename="applications")
 router.register("organizations", views.OrganizationViewSet, basename="organizations")
+# Agent FLIT lives under the same prefixes; these view sets only add detail routes.
+router.register("applications", views.ApplicationAgentViewSet, basename="application-agent")
+router.register("organizations", views.OrganizationAgentViewSet, basename="organization-agent")
 
 version_one_routes = [
     path("collect", views.CollectView.as_view(), name="collect"),
