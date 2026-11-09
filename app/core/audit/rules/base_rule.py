@@ -106,6 +106,14 @@ class BaseRule(metaclass=ABCMeta):
             return cls.on_failure
         return FailMode.CLOSED if cls.kind == RuleKind.CONTROL else FailMode.OPEN
 
+    def blocks_on_failure(self):
+        """
+        Whether this rule not running stops the decision outright. Failing
+        closed means review, and a review does not hold a transfer that the
+        caller sends anyway, so a control over money can ask for more.
+        """
+        return False
+
     @abstractmethod
     async def perform(self):
         pass

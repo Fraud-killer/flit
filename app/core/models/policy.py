@@ -30,6 +30,12 @@ class Policy(models.Model):
     identity_thresholds = models.JSONField(default=get_device_thresholds_default, blank=True)
     # Overrides for core.audit.rules.crypto_thresholds.DEFAULT_CRYPTO_THRESHOLDS
     crypto_thresholds = models.JSONField(default=get_device_thresholds_default, blank=True)
+    # Value ceilings per credential, channel and application. Empty applies
+    # none. See core.services.outflow_window for the shape.
+    outflow_limits = models.JSONField(default=get_device_thresholds_default, blank=True)
+    # {"enabled", "cooling_hours", "fail"}: refuse a credential paying a
+    # beneficiary it has no trusted history with. See core.services.money_out.
+    beneficiary_control = models.JSONField(default=get_device_thresholds_default, blank=True)
     # What the calibrator has learned from this application's outcomes:
     # `weights` (per-code overrides on core.scoring.DEFAULT_WEIGHTS),
     # `thresholds` (block_at / review_at), `calibrated_at` and the `run_id`

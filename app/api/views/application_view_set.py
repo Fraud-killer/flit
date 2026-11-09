@@ -22,8 +22,10 @@ from api.parsers import parse_challenge_inputs, parse_challenge_verification
 from api.parsers import parse_calibration_inputs
 from api.parsers import parse_policy_inputs
 from api.parsers import parse_loss_inputs
+from api.parsers import parse_beneficiary_inputs, parse_outflow_trip_inputs
 from core.loss import Loss, LossReport
 from core.messages.policies import msg_policy_loosening
+from core.messages.outflow import msg_outflow_trip_released
 from api.serializers.case_serializers import serialize_case
 from api.serializers.challenge_serializers import serialize_challenge
 from core.services.publish_outcome import PublishOutcome
@@ -100,6 +102,10 @@ class ApplicationViewSet(ViewSet):
         else:
             audit_log.loss_amount, audit_log.loss_currency = Loss.at_stake(audit_log)
         audit_log.save(update_fields=["label", "labeled_at", "loss_amount", "loss_currency"])
+
+        # Fraud over a credential-to-beneficiary link ends the trust in it.
+        from core.services.money_out import MoneyOut
+        MoneyOut.on_label(audit_log)
 
         # A reported outcome is ground truth. Publishing it is what lets the
         # rest of the network learn from this merchant's experience.
@@ -367,6 +373,63 @@ class ApplicationViewSet(ViewSet):
                 )
 
         return build_api_response(data=PolicyChange.describe(inputs.application))
+
+    @action(detail=True, methods=[HTTPMethod.GET], url_path=r"outflow-trips")
+    def outflow_trips(self, request, pk):
+        """The scopes stopped by the outflow breaker; `?all=1` adds released ones."""
+        from api.parsers.parse_application_id import parse_application_id
+        from core.models import OutflowTrip
+        from core.services.money_out import MoneyOut
+
+        errors = list()
+        application = parse_application_id(pk, errors)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, application).can_manage()
+
+        trips = OutflowTrip.objects.filter(application=application)
+        if request.query_params.get("all") not in ("1", "true", "yes"):
+            trips = trips.filter(released_at__isnull=True)
+
+        return build_api_response(data=dict(trips=[MoneyOut.describe(trip) for trip in trips[:200]]))
+
+    @action(detail=True, methods=[HTTPMethod.PATCH], url_path=r"outflow-trips/(?P<trip_id>[^/.]+)")
+    def outflow_trip(self, request, pk, trip_id=None):
+        """
+        A signed-in person lets a stopped scope move money again. Never an
+        application key: if that key is what leaked, the attacker holds it.
+        """
+        from api.views.agent_view_set import need_person, person
+        from core.services.money_out import MoneyOut
+
+        inputs, errors = parse_outflow_trip_inputs(pk, trip_id, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+        refused = need_person(request)
+        if refused: return refused
+
+        if inputs.trip.released_at is not None:
+            return build_api_response(errors=[msg_outflow_trip_released], status_code=409)
+
+        trip = MoneyOut.release(inputs.trip, user=person(request), note=inputs.note)
+        return build_api_response(data=dict(trip=MoneyOut.describe(trip)))
+
+    @action(detail=True, methods=[HTTPMethod.POST], url_path=r"trusted-beneficiaries")
+    def trusted_beneficiaries(self, request, pk):
+        """A signed-in person vouches for beneficiaries; a key may not add trust."""
+        from api.views.agent_view_set import need_person, person
+        from core.services.money_out import MoneyOut
+
+        inputs, errors = parse_beneficiary_inputs(pk, request)
+        if errors: return build_api_response(errors=errors)
+
+        ApplicationGuard(request.auth, inputs.application).can_manage()
+        refused = need_person(request)
+        if refused: return refused
+
+        MoneyOut.approve(inputs.application, inputs.entries, user=person(request))
+        return build_api_response(data=dict(approved=len(inputs.entries)), status_code=201)
 
     @action(
         detail=True,

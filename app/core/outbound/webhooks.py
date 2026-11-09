@@ -51,6 +51,7 @@ EVENTS = (
     "investigation.completed",
     "agent.approval_requested",
     "monitor.fired",
+    "outflow.tripped",
 )
 
 TIMEOUT_SECONDS = 10

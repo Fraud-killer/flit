@@ -167,6 +167,9 @@ class AuditRecorder:
                 currency_code=cls.value(event, "currency_code"),
                 transaction_type=cls.value(event, "type"),
                 counterparty_id=cls.value(event, "counterparty_id"),
+                counterparty_bank=cls.value(event, "counterparty_bank"),
+                initiator_id=cls.value(event, "initiator_id"),
+                channel=cls.value(event, "channel"),
                 card_fingerprint=cls.value(event, "card_fingerprint"),
                 # Crypto movement, recorded as the normalised correlation key
                 # rather than the raw address, so history compares the way the

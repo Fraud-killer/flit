@@ -10,7 +10,8 @@ it looser. Either way the change, and which way it went, is written to the
 audit chain.
 
 Loosening means: a threshold raised, a block, review or challenge rule
-removed, an allow rule added, a rule disabled, a weight lowered.
+removed, an allow rule added, a rule disabled, a weight lowered, an outflow
+limit raised or removed, or the beneficiary control relaxed.
 """
 
 import logging
@@ -49,6 +50,8 @@ class PolicyChange:
             shadow_rules=sorted(getattr(policy, "shadow_rules", None) or []),
             challenge_method=getattr(policy, "challenge_method", None),
             latency_budget_ms=policy.latency_budget_ms,
+            outflow_limits=dict(getattr(policy, "outflow_limits", None) or {}),
+            beneficiary_control=dict(getattr(policy, "beneficiary_control", None) or {}),
         )
 
     @classmethod
@@ -72,6 +75,11 @@ class PolicyChange:
         if "challenge_method" in changes:
             after["challenge_method"] = changes["challenge_method"]
 
+        if "outflow_limits" in changes:
+            after["outflow_limits"] = dict(changes["outflow_limits"] or {})
+        if "beneficiary_control" in changes:
+            after["beneficiary_control"] = dict(changes["beneficiary_control"] or {})
+
         loosened = cls.loosenings(before, after)
 
         if loosened and not cls.is_owner(actor, policy.application):
@@ -86,9 +94,11 @@ class PolicyChange:
         policy.shadow_rules = after["shadow_rules"]
         policy.challenge_method = after["challenge_method"]
         policy.latency_budget_ms = after["latency_budget_ms"]
+        policy.outflow_limits = after["outflow_limits"]
+        policy.beneficiary_control = after["beneficiary_control"]
         policy.save(update_fields=[
             "calibration", "rules", "disabled_rules", "shadow_rules", "challenge_method",
-            "latency_budget_ms", "updated_at",
+            "latency_budget_ms", "outflow_limits", "beneficiary_control", "updated_at",
         ])
 
         cls.apply_outbound(policy.application, changes)
@@ -132,6 +142,61 @@ class PolicyChange:
         for name in set(after["shadow_rules"]) - set(before["shadow_rules"]):
             found.append(f"rule moved to shadow: {name}")
 
+        found.extend(cls.outflow_loosenings(before["outflow_limits"], after["outflow_limits"]))
+        found.extend(cls.beneficiary_loosenings(before["beneficiary_control"], after["beneficiary_control"]))
+
+        return found
+
+    @staticmethod
+    def outflow_loosenings(before, after):
+        from core.services.outflow_window import FAIL_BLOCK, SCOPE_KEYS
+
+        if not before:
+            return []
+        if not after:
+            return ["outflow limits removed"]
+
+        found = []
+        for key in SCOPE_KEYS.values():
+            for window, limit in (before.get(key) or {}).items():
+                new = (after.get(key) or {}).get(window)
+                if new is None:
+                    found.append(f"outflow limit removed: {key}.{window}")
+                elif new > limit:
+                    found.append(f"outflow limit raised: {key}.{window} {limit} -> {new}")
+
+        if before.get("currency") != after.get("currency"):
+            found.append("outflow limit currency changed")
+
+        # Any change to the hours moves the tighter limit off some part of the
+        # night, so only a lower factor over the same hours counts as tighter.
+        hours, new_hours = before.get("off_hours"), after.get("off_hours")
+        if hours:
+            same = new_hours and all(new_hours.get(k) == hours[k] for k in ("start", "end", "timezone"))
+            if not same or new_hours["factor"] > hours["factor"]:
+                found.append("outflow off-hours limit relaxed")
+
+        if before.get("fail", FAIL_BLOCK) == FAIL_BLOCK and after.get("fail", FAIL_BLOCK) != FAIL_BLOCK:
+            found.append("outflow failure handling relaxed to review")
+
+        return found
+
+    @staticmethod
+    def beneficiary_loosenings(before, after):
+        from core.services.money_out import DEFAULT_COOLING_HOURS
+
+        if not before.get("enabled"):
+            return []
+        if not after.get("enabled"):
+            return ["beneficiary control turned off"]
+
+        found = []
+        hours = before.get("cooling_hours", DEFAULT_COOLING_HOURS)
+        new_hours = after.get("cooling_hours", DEFAULT_COOLING_HOURS)
+        if new_hours < hours:
+            found.append(f"beneficiary cooling period shortened {hours} -> {new_hours}")
+        if before.get("fail", "block") == "block" and after.get("fail", "block") != "block":
+            found.append("beneficiary failure handling relaxed to review")
         return found
 
     @staticmethod

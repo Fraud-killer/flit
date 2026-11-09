@@ -41,6 +41,14 @@ class TransactionEvent(BaseEvent):
         # destination is routinely shared by thousands of unrelated customers.
         "counterparty_address",
         "transaction_hash",
+        # Who moved the money, as opposed to whose account it left: a partner
+        # credential, an operator, a service. One credential draining many
+        # accounts is invisible without it.
+        "initiator_id",
+        # The rail, e.g. "nip" or "intrabank".
+        "channel",
+        # The beneficiary's bank. An account number alone is not unique.
+        "counterparty_bank",
     ]
 
     def verify(self, policy=None):
@@ -107,6 +115,11 @@ class TransactionEvent(BaseEvent):
             and (type(self.account_age_days) is not int or self.account_age_days < 0)
         ):
             errors.append(msg_void_or_decimal.new(path="account_age_days"))
+
+        for name in ("initiator_id", "channel", "counterparty_bank"):
+            value = getattr(self, name, None)
+            if is_present(value) and not (is_dense_str(value) and len(value) <= 128):
+                errors.append(msg_void_or_dense_string.new(path=name))
 
         errors.extend(self.verify_visit_attrs())
         errors.extend(self.verify_network_attrs())

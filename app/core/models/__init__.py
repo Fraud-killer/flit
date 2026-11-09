@@ -47,3 +47,6 @@ from .agent import MonitorStatus as MonitorStatus
 from .agent import MonitorMetric as MonitorMetric
 from .agent import MonitorAction as MonitorAction
 from .agent import Playbook as Playbook
+
+from .outflow import InitiatorBeneficiary as InitiatorBeneficiary
+from .outflow import OutflowTrip as OutflowTrip

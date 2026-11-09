@@ -56,3 +56,5 @@ from .session_shape_rule import SessionShapeRule as SessionShapeRule
 
 from .block_streak_rule import BlockStreakRule as BlockStreakRule
 from .challenge_passed_rule import ChallengePassedRule as ChallengePassedRule
+from .outflow_breaker_rule import OutflowBreakerRule as OutflowBreakerRule
+from .unknown_beneficiary_rule import UnknownBeneficiaryRule as UnknownBeneficiaryRule

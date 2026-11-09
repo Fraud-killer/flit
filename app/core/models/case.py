@@ -158,6 +158,9 @@ class Case(models.Model):
             audit_log.labeled_at = timezone.now()
             audit_log.save(update_fields=["label", "labeled_at"])
 
+            from core.services.money_out import MoneyOut
+            MoneyOut.on_label(audit_log)
+
             # A closed case is the best ground truth FLIT gets. Publishing it
             # is what turns one merchant's review into the next merchant's
             # defence.

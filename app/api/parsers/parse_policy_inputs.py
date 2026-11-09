@@ -3,10 +3,13 @@ from devkit.struct import Struct
 from devkit.messages import msg_dict, msg_void_or_decimal
 
 from core.decision import validate_rules
+from core.messages.outflow import msg_outflow_config
 from core.messages.policies import msg_weights_empty, msg_outbound_url
 from core.models.challenge import ChallengeMethod
 from core.outbound import BlockedAddressError, check_url
 from core.outbound.webhooks import EVENTS as WEBHOOK_EVENTS
+from core.services.money_out import BeneficiaryControl
+from core.services.outflow_window import OutflowLimits
 from devkit.messages import msg_in_choices
 
 from .parse_application_id import parse_application_id
@@ -100,6 +103,19 @@ def parse_policy_inputs(id, request):
                     errors.extend(problems)
                 else:
                     changes["decision_hook"] = hook
+
+        for name, validate in (
+            ("outflow_limits", OutflowLimits.validate),
+            ("beneficiary_control", BeneficiaryControl.validate),
+        ):
+            value = body.get(name, undefined)
+            if value is undefined:
+                continue
+            problems = [] if value is None else validate(value)
+            if problems:
+                errors.append(msg_outflow_config.new(path=name, context=dict(problems=problems)))
+            else:
+                changes[name] = value
 
         budget = body.get("latency_budget_ms", undefined)
         if budget is not undefined:
