@@ -81,6 +81,11 @@ class Application(models.Model):
     decision_hook_url = models.URLField(max_length=500, null=True, blank=True)
     decision_hook_timeout_ms = models.IntegerField(default=150)
 
+    # Audit calls allowed per minute, per origin. Null uses the default in
+    # core.security.rate_limiter. A bank's payment path can pass the default,
+    # and a refused decision on money out is a refused payment.
+    audit_rate_limit_per_minute = models.PositiveIntegerField(null=True, blank=True)
+
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

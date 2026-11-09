@@ -23,7 +23,7 @@ Of the 19 covered techniques, **1** rest on a detector with measured precision a
 | Rung | Detectors | What it requires |
 |---|---|---|
 | Proposed | 12 | Reasoned from how the fraud works. No evidence yet. |
-| Synthetic-tested | 34 | Fires on a constructed example of the technique and stays quiet on a constructed legitimate lookalike. |
+| Synthetic-tested | 36 | Fires on a constructed example of the technique and stays quiet on a constructed legitimate lookalike. |
 | Historically backtested | 1 | Run against a merchant's labelled history, with measured precision and recall at the shipped threshold. |
 | Shadow-validated | 0 | Run against live traffic without acting on it, and reviewed. |
 | Production-observed | 0 | Acting in production, with its decisions labelled by reviewers. |
@@ -179,6 +179,7 @@ These happen where a server-side decision layer has no eyes. They are listed so 
 | NetworkReputationRule | corroboration | — | Synthetic-tested | tests/unit/test_protection_network.py |
 | NewDeviceCountryRule | detection | `F1006` | Proposed | — |
 | NewWithdrawalAddressRule | detection | `F1005` | Synthetic-tested | tests/unit/test_crypto.py::TestNewWithdrawalAddress |
+| OutflowBreakerRule | control | — | Synthetic-tested | tests/unit/test_outflow_breaker.py::TestOutflowBreaker |
 | PassThroughRule | detection | `F1047`, `F1025` | Synthetic-tested | tests/unit/test_mule_detection.py::TestPassThroughRule |
 | PaymentFraudRule | detection | `F1028` | Synthetic-tested | tests/unit/test_fraud_rules.py::TestPaymentFraudRule |
 | ResetToLoginRule | detection | `F1006.003`, `F1006` | Synthetic-tested | tests/unit/test_credential_takeover.py::TestOctober2026Replay |
@@ -187,6 +188,7 @@ These happen where a server-side decision layer has no eyes. They are listed so 
 | SessionShapeRule | detection | `F1002`, `F1006`, `T1585` | Synthetic-tested | tests/unit/test_session_scoring.py::TestEvasiveReplay |
 | StructuringRule | detection | `F1045` | Historically backtested | Replayed against 11,868 labelled Figo transactions (2026-02-01 to 2026-09-19, 235 fraud / 11,408 legit): fired 56 times, 12 on fraud, lift 13.1, precision 0.214. The only rule in FLIT with measured lift above 1 on that portfolio. Also tests/unit/test_mule_detection.py::TestStructuringRule. |
 | ThreeDSTimeoutRule | detection | `F1001`, `F1039` | Synthetic-tested | tests/unit/test_fraud_rules.py::TestThreeDSTimeoutRule |
+| UnknownBeneficiaryRule | control | — | Synthetic-tested | tests/unit/test_outflow_breaker.py::TestUnknownBeneficiary |
 | UnregisteredDeviceRule | detection | `F1006` | Proposed | — |
 | VelocityCheckRule | detection | `T1110` | Proposed | — |
 

@@ -26,7 +26,10 @@ class SecurityMiddleware:
     # Decisions have their own, wider bucket: a merchant's checkout sends one
     # audit per payment, and sharing the general limit would throttle the
     # thing FLIT is for.
-    AUDIT_PATH = re.compile(r"^/api/v1/applications/[^/]+/audit-")
+    AUDIT_PATH = re.compile(r"^/api/v1/applications/(?P<application_id>[^/]+)/audit-")
+
+    # An application's own audit limit is read on every call, so briefly kept.
+    AUDIT_LIMIT_CACHE_SECONDS = 60
 
     def __init__(self, get_response):
         self.get_response = get_response
@@ -55,15 +58,41 @@ class SecurityMiddleware:
         client_id = RateLimiter.get_client_identifier(request)
 
         action = "api_general"
-        if self.AUDIT_PATH.match(request.path):
+        audit = self.AUDIT_PATH.match(request.path)
+        if audit:
             action = "api_audit"
-        else:
-            for path_prefix, action_name in self.RATE_LIMIT_ACTIONS.items():
-                if request.path.startswith(path_prefix):
-                    action = action_name
-                    break
+            return RateLimiter.check(client_id, action, self._audit_config(audit["application_id"]))
+
+        for path_prefix, action_name in self.RATE_LIMIT_ACTIONS.items():
+            if request.path.startswith(path_prefix):
+                action = action_name
+                break
 
         return RateLimiter.check(client_id, action)
+
+    @classmethod
+    def _audit_config(cls, application_id):
+        """
+        The application's audit limit, or None for the default. Read before
+        the request is authenticated, so a bad signature on a bank's path gets
+        the bank's bucket. It still fails at the signature check.
+        """
+        from django.core.cache import cache
+        from core.models import Application
+        from core.security.rate_limiter import RateLimitConfig
+
+        try:
+            key = f"flit:auditlimit:{application_id[:64]}"
+            limit = cache.get(key)
+            if limit is None:
+                limit = (
+                    Application.objects.filter(id=application_id)
+                    .values_list("audit_rate_limit_per_minute", flat=True).first()
+                ) or 0
+                cache.set(key, limit, cls.AUDIT_LIMIT_CACHE_SECONDS)
+            return RateLimitConfig(requests=limit, window_seconds=60) if limit else None
+        except Exception:
+            return None
 
     def _record_breach(self, request, error):
         """

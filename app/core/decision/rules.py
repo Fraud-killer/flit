@@ -228,6 +228,16 @@ class CounterpartyMatcher(Matcher):
             return False
 
 
+@subject("initiator")
+class InitiatorMatcher(Matcher):
+    """The credential, partner or operator that initiated a transfer."""
+
+    @staticmethod
+    def matches(pattern, facts):
+        initiator = facts.get("initiator")
+        return bool(initiator) and str(initiator) == pattern.strip()
+
+
 @subject("factor")
 class FactorMatcher(Matcher):
     """A rule code this decision produced, or a glob over codes."""
@@ -434,6 +444,7 @@ class DecisionRules:
             wallet=wallet or rung("wallet"),
             chain=chain,
             counterparties=[c for c in counterparties if c],
+            initiator=value("initiator_id"),
             factors=list(factors or []),
         )
 

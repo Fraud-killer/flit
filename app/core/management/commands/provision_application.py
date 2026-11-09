@@ -46,6 +46,16 @@ class Command(BaseCommand):
             help="AML limit amount, paired with --currency (default 10,000.00)",
         )
 
+        parser.add_argument(
+            "--audit-rate-limit",
+            type=int,
+            help=(
+                "Audit calls per minute, per origin (default: the server's). "
+                "Set this for a payment path busier than the default, because "
+                "a refused decision on money out is a refused payment."
+            ),
+        )
+
     @transaction.atomic
     def handle(self, *args, **options):
         name = options["name"]
@@ -74,6 +84,10 @@ class Command(BaseCommand):
             policy = application.policy
             policy.aml_cft_limit = f"{options['currency']} {options['aml_limit']}"
             policy.save(update_fields=["aml_cft_limit"])
+
+        if options["audit_rate_limit"]:
+            application.audit_rate_limit_per_minute = options["audit_rate_limit"]
+            application.save(update_fields=["audit_rate_limit_per_minute"])
 
         secret_key = mcrypt.decrypt(application.secret_key)
 

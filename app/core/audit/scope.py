@@ -20,6 +20,13 @@ class Scope(LockCache):
     # The account's recent transactions, set by Auditor.
     account_activity = None
 
+    # Whether this decision is about real money tonight, set by Auditor. A
+    # replay of history records decisions but must not spend outflow limits.
+    measures_outflow = False
+
+    # What OutflowBreakerRule added to the windows, so a refusal can undo it.
+    outflow_reservation = None
+
     @lockcache(lambda visit_id: visit_id)
     async def fetch_visit(self, visit_id):
         return await FetchVisitData.async_call(

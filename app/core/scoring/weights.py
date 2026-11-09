@@ -148,6 +148,14 @@ class RiskWeights:
     challenge_replay_rejected: float = 0.0
     # A rule running in shadow: its findings are recorded, never counted.
     shadow_finding: float = 0.0
+    # Money-out controls. A limit or an unknown beneficiary is a hard block and
+    # carries full weight, so the recorded score agrees with the action. The
+    # other two report a gap and act through flags.
+    outflow_limit_exceeded: float = 1.0
+    outflow_trip_active: float = 1.0
+    unknown_beneficiary: float = 1.0
+    outflow_unmeasured: float = 0.0
+    beneficiary_unverified: float = 0.0
 
     # Per-code overrides, used to try candidate weights without touching
     # the defaults (see core.services.simulate_policy).
@@ -279,6 +287,11 @@ class RiskWeights:
             "recent_challenge_passed": self.recent_challenge_passed,
             "challenge_replay_rejected": self.challenge_replay_rejected,
             "shadow_finding": self.shadow_finding,
+            "outflow_limit_exceeded": self.outflow_limit_exceeded,
+            "outflow_trip_active": self.outflow_trip_active,
+            "unknown_beneficiary": self.unknown_beneficiary,
+            "outflow_unmeasured": self.outflow_unmeasured,
+            "beneficiary_unverified": self.beneficiary_unverified,
         }
         if rule_code in weight_map:
             return weight_map[rule_code]

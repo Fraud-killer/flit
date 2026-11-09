@@ -218,6 +218,106 @@ timeout is what actually protects a signup path — not the average.
 | `/health/ready/` | Readiness — checks the database |
 | `/health/status/` | Detailed status |
 
+## Running FLIT on a bank's money-out path
+
+These controls stop one credential from draining accounts. Both are off until
+a policy turns them on, so nothing changes for other integrations.
+
+**FLIT only protects paths that call it.** Every debit path has to call
+`audit-transaction` before the money moves, and has to refuse the transfer
+unless the answer says otherwise. A route that skips the call is unprotected,
+and so is a flaw that lets an attacker skip the bank's own middleware. FLIT also
+does not replace the bank's authorization: a partner credential that can reach
+other merchants' accounts has to be fixed in the bank's API.
+
+**What each debit must send**, besides the amount, currency and `client_id`:
+
+| Field | Meaning |
+|---|---|
+| `initiator_id` | The credential, partner or operator behind the transfer |
+| `channel` | The rail, such as `nip` or `intrabank` |
+| `counterparty_id` | The beneficiary's account |
+| `counterparty_bank` | The beneficiary's bank; an account number alone is not unique |
+
+Send an `initiator_id` for customer-initiated debits too, such as `customer`.
+
+**Fail closed.** Wrap these calls in `failClosed(flit.auditPayout(event))` from
+`sdk/node/flit.mjs`, or do the equivalent in your own client: no decision, no
+transfer. `failOpen` is for signups. Check the volume on this path against the
+default of 1,000 audit calls a minute per origin, and set
+`provision_application --audit-rate-limit` if it could pass that, because a
+refused call is now a refused payment.
+
+**Configure the policy** with `PATCH /api/v1/applications/:id/policy`:
+
+```json
+{
+  "beneficiary_control": {"enabled": true, "cooling_hours": 72},
+  "outflow_limits": {
+    "currency": "NGN",
+    "per_initiator": {"15m": 5000000, "1h": 10000000, "24h": 50000000},
+    "per_initiator_untrusted": {"1h": 2000000, "24h": 5000000},
+    "per_channel": {"1h": 50000000},
+    "per_application": {"24h": 500000000},
+    "off_hours": {"start": "20:00", "end": "07:00", "timezone": "Africa/Lagos", "factor": 0.25},
+    "fail": "block"
+  }
+}
+```
+
+The numbers above show the shape only. Set them from the bank's own volumes. An
+application key can tighten these; only a signed-in owner can raise, remove or
+relax them.
+
+**Go-live order:**
+
+1. Run in shadow for longer than the cooling period. `should_block` stays false,
+   `would_block` shows what would have stopped, and beneficiaries are learned.
+2. Add known settlement accounts with `POST .../trusted-beneficiaries`, which
+   needs a signed-in person.
+3. Review the would-be stops against known-good traffic, and set the limits.
+4. Move to enforcing with `set_enforcement`.
+
+If a business legitimately pays new beneficiaries, leave `UnknownBeneficiaryRule`
+in `shadow_rules` and rely on the breaker, with a `per_initiator_untrusted` limit.
+In shadow, the rule's findings show how much of the real volume goes to new
+beneficiaries, which is the number to set that limit from.
+
+**Unknown beneficiary.** A debit is refused unless this credential has a trusted
+history of paying this beneficiary from this account. Trust comes from a link
+aging through the cooling period or from a person's approval. A fraud or
+chargeback label ends it. Once enforcing, a refused transfer teaches FLIT
+nothing, so a genuinely new beneficiary needs a person to approve it first.
+
+**Outflow breaker.** A debit that would take a scope over a limit is refused, and
+the scope stays stopped until a signed-in person releases it with
+`PATCH .../outflow-trips/:id`, which also clears its window. Open trips are at
+`GET .../outflow-trips`. A `per_application` or `per_channel` trip stops all
+outflow in that scope, so set those limits with that in mind. Each trip sends an
+`outflow.tripped` webhook straight away and opens a case.
+
+`per_initiator_untrusted` counts only debits to a beneficiary this credential
+has no trusted history of paying from this account, or debits that don't say
+where they go. It can sit far below `per_initiator`, because a drain goes to new
+accounts and settlement mostly doesn't. Its trip stops only such debits, so
+payments to trusted beneficiaries carry on. Links are learned whenever this
+limit or `beneficiary_control` is set. When a credential trips, its links still
+in the cooling period are revoked, so payees found during a drain kept under the
+limit never become trusted by age; a person can approve any that are genuine.
+It doesn't stop a drain that stays under this limit night after night; size it
+with that in mind. Point that webhook at
+something that wakes a person up, because trips happen at night.
+
+**Redis.** Window totals live in the cache. If Redis cannot be reached, debits
+are refused (or reviewed, with `"fail": "review"`). If Redis restarts or evicts
+these keys, the totals restart from zero without any error. Use persistence and a
+`noeviction` policy, and confirm both on the deployed instance. Open trips and
+beneficiary links are in Postgres and are not affected.
+
+**What this does not do:** it doesn't connect to NIBSS, trace funds across banks,
+or detect POS cash-out. It has been tested only against synthetic data, so the
+coverage matrix lists both rules as synthetic-tested.
+
 ## Known gaps
 
 - **No static file server.** `django.contrib.admin` is installed but its CSS

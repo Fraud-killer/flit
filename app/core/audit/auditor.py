@@ -86,6 +86,9 @@ class Auditor:
         rules.SessionShapeRule,
         # The origin's own recent blocks
         rules.BlockStreakRule,
+        # Money leaving through a credential
+        rules.UnknownBeneficiaryRule,
+        rules.OutflowBreakerRule,
     )
 
     @classmethod
@@ -101,6 +104,7 @@ class Auditor:
     ):
         active_rules = list()
         scope = Scope()
+        scope.measures_outflow = record and send_alerts
 
         # Everything below runs on the event loop and reads
         # `policy.application` freely. Load it, and its organization, once
@@ -276,6 +280,9 @@ class Auditor:
             organization_policy is not None and organization_policy.requires_enforcing
         )
 
+        if scope.measures_outflow:
+            await cls._settle_money_out(event, policy, scope, risk_result, reasons, audit_log, enforcing)
+
         # When the policy says so, a decision that asks for a step-up issues
         # it, so the merchant verifies and replays rather than calling twice.
         challenge = None
@@ -326,6 +333,27 @@ class Auditor:
     # Consecutive blocks at which one origin becomes a campaign worth a
     # reviewer's attention right now, not in the queue.
     CAMPAIGN_ALERT_AT = 3
+
+    # The most a trip may add to the decision that caused it. A slow endpoint
+    # leaves the delivery queued, and the cron sends it.
+    TRIP_ALERT_SECONDS = 1.0
+
+    @classmethod
+    async def _settle_money_out(cls, event, policy, scope, risk_result, reasons, audit_log, enforcing):
+        from core.outbound import Webhooks
+        from core.services.money_out import MoneyOut
+
+        try:
+            deliveries = await sync_to_async(MoneyOut.settle)(
+                event=event, policy=policy, scope=scope, risk_result=risk_result,
+                reasons=reasons, audit_log=audit_log, enforcing=enforcing,
+            )
+            for delivery in deliveries:
+                await asyncio.wait_for(Webhooks.deliver(delivery), cls.TRIP_ALERT_SECONDS)
+        except asyncio.TimeoutError:
+            logger.warning("Outflow trip alert left to the delivery queue")
+        except Exception:
+            logger.exception("Could not settle money-out records")
 
     @staticmethod
     def origin(event, scope):
@@ -561,6 +589,7 @@ class Auditor:
                 fail_mode=fail_mode,
                 score=0.0,
                 force_review=fail_mode == FailMode.CLOSED,
+                **(dict(hard_block=True) if rule.blocks_on_failure() else {}),
             ),
         )
 

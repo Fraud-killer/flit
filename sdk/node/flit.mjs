@@ -84,14 +84,21 @@ export class Flit {
    * `timeoutMs` is short on purpose. A fraud decision that has not arrived is
    * not a reason to fail a customer's signup — see `failOpen`.
    */
-  constructor({ baseUrl, applicationId, secretKey, timeoutMs = 2000 }) {
+  constructor({
+    baseUrl,
+    applicationId,
+    secretKey,
+    timeoutMs = 2000,
+    payoutTimeoutMs = 5000,
+  }) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
     this.applicationId = applicationId;
     this.secretKey = secretKey;
     this.timeoutMs = timeoutMs;
+    this.payoutTimeoutMs = payoutTimeoutMs;
   }
 
-  async post(path, body) {
+  async post(path, body, { timeoutMs = this.timeoutMs } = {}) {
     // Seconds, not milliseconds. The replay-protection middleware compares
     // this against its own clock in seconds, so Date.now() lands roughly
     // fifty thousand years in the future and every request is rejected as a
@@ -120,7 +127,7 @@ export class Flit {
         }),
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(this.timeoutMs),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     return response.json();
@@ -137,6 +144,19 @@ export class Flit {
     return this.post(
       "/api/v1/applications/" + this.applicationId + "/audit-transaction",
       event,
+    );
+  }
+
+  /**
+   * A debit leaving the bank. Wrap it in `failClosed`. The timeout outlasts
+   * the server's 3-second rule budget, so a slow decision comes back as a
+   * decision and not as a client-side abort.
+   */
+  auditPayout(event) {
+    return this.post(
+      "/api/v1/applications/" + this.applicationId + "/audit-transaction",
+      { ...event, type: "debit" },
+      { timeoutMs: this.payoutTimeoutMs },
     );
   }
 
@@ -181,6 +201,30 @@ export async function failOpen(promise, onError = () => {}) {
     onError(error);
     return inert();
   }
+}
+
+/**
+ * Run a decision on money leaving, where no answer means no transfer.
+ *
+ * The opposite trade from `failOpen`. A signup that slips through can be dealt
+ * with later; money sent over NIP is gone in seconds. Any failure, including a
+ * rate-limit refusal or a response with no decision in it, comes back blocked
+ * and marked `unavailable`, so the caller can tell an outage from a verdict.
+ */
+export async function failClosed(promise, onError = () => {}) {
+  try {
+    const body = await promise;
+    if (body && body.data) return body.data;
+    onError(new Error("FLIT returned no decision"));
+  } catch (error) {
+    onError(error);
+  }
+  return {
+    should_block: true,
+    should_challenge: false,
+    should_review: true,
+    unavailable: true,
+  };
 }
 
 function inert() {

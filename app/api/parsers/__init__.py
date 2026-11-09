@@ -17,6 +17,8 @@ from .parse_challenge_verification import (
 )
 from .parse_policy_inputs import parse_policy_inputs as parse_policy_inputs
 from .parse_loss_inputs import parse_loss_inputs as parse_loss_inputs
+from .parse_outflow_inputs import parse_beneficiary_inputs as parse_beneficiary_inputs
+from .parse_outflow_inputs import parse_outflow_trip_inputs as parse_outflow_trip_inputs
 from .parse_agent_inputs import (
     parse_agent_policy_inputs as parse_agent_policy_inputs,
     parse_investigation_inputs as parse_investigation_inputs,
