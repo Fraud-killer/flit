@@ -375,6 +375,33 @@ class TestUntouchedIntegrations:
 
         assert not InitiatorBeneficiary.objects.exists()
 
+    @pytest.mark.parametrize("controls", [False, True])
+    def test_a_login_or_signup_settles_without_an_error(self, application, no_geoip, caplog, controls):
+        # Only transactions have a type. Settling a login once raised
+        # AttributeError, which the auditor caught and logged as an error on
+        # every non-money event.
+        from core.audit.auditor import Auditor
+        from core.audit.events import AuthenticationEvent, RegistrationEvent
+
+        if controls:
+            policy = application.policy
+            policy.outflow_limits = LIMITS
+            policy.beneficiary_control = dict(enabled=True, cooling_hours=72)
+            policy.save()
+        set_enforcement(application, "enforcing")
+        policy = type(application).objects.get(id=application.id).policy
+
+        for event in (
+            AuthenticationEvent(id="a1", client_id="u1", action="login", ip_address="102.89.1.1",
+                                user_agent="Mozilla/5.0 Chrome/120.0"),
+            RegistrationEvent(id="u2", client_id="u2", email="u2@gmail.com", country="NG",
+                              ip_address="102.89.1.2", user_agent="Mozilla/5.0 Chrome/120.0",
+                              action="registration"),
+        ):
+            async_to_sync(Auditor.audit)(event, policy)
+
+        assert "Could not settle money-out records" not in caplog.text
+
 
 class TestOvernightDrainReplay:
     """

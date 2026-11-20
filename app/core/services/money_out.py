@@ -232,7 +232,8 @@ class MoneyOut:
 
     @classmethod
     def _learn(cls, event, policy):
-        if event.type != "debit" or not BeneficiaryTrust.learns(policy):
+        # Only transactions have a type; a login or a signup moves no money.
+        if getattr(event, "type", None) != "debit" or not BeneficiaryTrust.learns(policy):
             return
 
         initiator = cls._value(event, "initiator_id")
