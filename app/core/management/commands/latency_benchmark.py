@@ -170,6 +170,10 @@ class Command(BaseCommand):
         parser.add_argument("--events", type=int, default=1000, help="measured events (default 1000)")
         parser.add_argument("--warmup", type=int, default=100,
                             help="events run first and not measured, so history-reading rules have history")
+        parser.add_argument("--history-days", type=float, default=7.0,
+                            help="spread the warm-up history evenly over this many past days, as real "
+                                 "traffic would be (default 7). 0 leaves it in the last few minutes: "
+                                 "every origin's hour is then full, a stress test rather than a forecast")
         parser.add_argument("--accounts", type=int, default=300)
         parser.add_argument("--origins", type=int, default=60, help="distinct client IP addresses")
         parser.add_argument("--concurrency", type=int, default=1,
@@ -271,7 +275,8 @@ class Command(BaseCommand):
                 raise failures[0]
             return results
 
-        in_workers(warmup)
+        history = in_workers(warmup)
+        self.spread(history, options["history_days"])
         wall_started = time.perf_counter()
         samples = in_workers(measured)
         wall_seconds = time.perf_counter() - wall_started
@@ -320,11 +325,35 @@ class Command(BaseCommand):
             spans_recorded=bool(decision),
         )
 
+    @staticmethod
+    def spread(history, days):
+        """
+        Move the warm-up decisions back in time, evenly over `days`, keeping
+        their order. Run back to back, a few thousand decisions land in a few
+        minutes, so every window a rule reads (an origin's hour, an account's
+        day) is full, and the benchmark measures an attack, not a Tuesday.
+        """
+        from datetime import timedelta
+        from django.utils import timezone
+        from core.models import AuditLog
+
+        ids = [audit_id for _, _, audit_id in history if audit_id]
+        if days <= 0 or not ids:
+            return
+
+        rows = list(AuditLog.objects.filter(id__in=ids).order_by("timestamp", "id").only("id", "timestamp"))
+        span, now = timedelta(days=days), timezone.now()
+        for index, row in enumerate(rows):
+            # The newest lands a minute ago, so nothing overlaps what is measured.
+            row.timestamp = now - timedelta(minutes=1) - span * (1 - index / len(rows))
+        AuditLog.objects.bulk_update(rows, ["timestamp"], batch_size=1000)
+
     def environment(self, options):
         from kernel.config import Config
 
         return dict(
             events=options["events"], warmup=options["warmup"], concurrency=options["concurrency"],
+            history_days=options["history_days"],
             accounts=options["accounts"], origins=options["origins"], money_out=options["money_out"],
             seed=options["seed"], target_p99_ms=options["target_ms"],
             database=connection.vendor,
@@ -342,8 +371,11 @@ class Command(BaseCommand):
         env = report["environment"]
         write = self.stdout.write
 
-        write(f"\nFLIT decision latency: {env['events']} events after {env['warmup']} warm-up, "
-              f"concurrency {env['concurrency']}, money-out controls {'on' if env['money_out'] else 'off'}")
+        spread = (f"spread over {env['history_days']:g} days" if env["history_days"] > 0
+                  else "all in the last few minutes (stress)")
+        write(f"\nFLIT decision latency: {env['events']} events after {env['warmup']} warm-up "
+              f"({spread}), concurrency {env['concurrency']}, money-out controls "
+              f"{'on' if env['money_out'] else 'off'}")
         write(f"database {env['database']}, cache {env['cache']}, domain lookups "
               f"{'on' if env['domain_lookups'] else 'off'}, chain lookups "
               f"{'on' if env['chain_lookups'] else 'off'}, GeoIP {'on' if env['geoip'] else 'off'}, "
