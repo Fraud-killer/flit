@@ -15,7 +15,7 @@ Thank you for your interest in contributing to FLIT! We welcome contributions fr
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-org/flit.git
+   git clone https://github.com/Fraud-killer/flit.git
    cd flit
    ```
 
