@@ -1,6 +1,6 @@
 from datetime import timedelta
 from django.utils import timezone
-from django.db.models import Count, Sum
+from django.db.models import Count, Q
 from devkit.message import Message
 from core.audit.events import TransactionEvent
 from core.audit.rules.base_rule import BaseRule
@@ -41,56 +41,52 @@ class VelocityCheckRule(BaseRule, LockCache):
 
     @lockcache(key="velocity_data")
     async def get_velocity_data(self):
+        """
+        Every window's counts from one query over the account's last day.
+
+        This used to be sixteen queries, four counts for each of four windows,
+        and it was the slowest rule in the engine: each one a round trip, and
+        the rules' database work shares a thread. Conditional aggregation
+        reads the same rows once.
+        """
+        from asgiref.sync import sync_to_async
         from core.audit.models import AuditLog, AuditLogCategory
 
-        now = timezone.now()
-        client_id = getattr(self.event, "client_id", None)
-        device_fingerprint = getattr(self.event, "device_fingerprint", None)
-
-        if not client_id and not device_fingerprint:
+        client_id = self.event.account_id
+        if not client_id:
             return None
 
-        base_query = AuditLog.objects.filter(
-            application_id=self.application.id,
-            category=AuditLogCategory.TRANSACTION,
-        )
+        now = timezone.now()
+        since = {name: now - delta for name, delta in self.VELOCITY_WINDOWS.items()}
+        widest = min(since.values())
 
-        if client_id:
-            base_query = base_query.filter(actor_id=client_id)
-
-        velocity_data = {}
-
-        for window_name, window_delta in self.VELOCITY_WINDOWS.items():
-            window_start = now - window_delta
-            window_query = base_query.filter(timestamp__gte=window_start)
-
-            velocity_data[window_name] = {
-                "transaction_count": await self._async_count(window_query),
-                "failed_count": await self._async_count(
-                    window_query.filter(outcome="failure")
-                ),
-                "unique_devices": await self._async_distinct_count(
-                    window_query, "device_fingerprint"
-                ),
-                "unique_ips": await self._async_distinct_count(
-                    window_query, "ip_address"
-                ),
-            }
-
-        return velocity_data
-
-    async def _async_count(self, queryset):
-        from asgiref.sync import sync_to_async
-        return await sync_to_async(queryset.count)()
-
-    async def _async_distinct_count(self, queryset, field):
-        from asgiref.sync import sync_to_async
+        aggregates = {}
+        for name, start in since.items():
+            within = Q(timestamp__gte=start)
+            aggregates[f"{name}__transaction_count"] = Count("id", filter=within)
+            aggregates[f"{name}__failed_count"] = Count("id", filter=within & Q(outcome="failure"))
+            # A missing device or address is not one more of them.
+            aggregates[f"{name}__unique_devices"] = Count("device_fingerprint", filter=within, distinct=True)
+            aggregates[f"{name}__unique_ips"] = Count("ip_address", filter=within, distinct=True)
 
         @sync_to_async
-        def get_count():
-            return queryset.values(field).distinct().count()
+        def fetch():
+            return AuditLog.objects.filter(
+                application_id=self.application.id,
+                category=AuditLogCategory.TRANSACTION,
+                actor_id=client_id,
+                timestamp__gte=widest,
+            ).aggregate(**aggregates)
 
-        return await get_count()
+        totals = await fetch()
+
+        return {
+            name: {
+                measure: totals[f"{name}__{measure}"] or 0
+                for measure in ("transaction_count", "failed_count", "unique_devices", "unique_ips")
+            }
+            for name in self.VELOCITY_WINDOWS
+        }
 
     def get_thresholds(self):
         policy_thresholds = getattr(self.policy, "velocity_thresholds", None)
