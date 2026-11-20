@@ -24,6 +24,7 @@ from collections import defaultdict
 from datetime import timedelta
 
 from django.core.cache import cache
+from django.db.models import F
 from django.utils import timezone
 
 from core.models import AuditLog
@@ -71,8 +72,13 @@ class SessionProfile:
     def __len__(self):
         return len(self.events)
 
+    # The columns of a recorded decision a session reads, besides `blocked`
+    # (context.should_block): what SessionActivity.load selects.
+    FIELDS = ("timestamp", "action", "actor_id", "user_agent", "category", "risk_score", "outcome")
+
     @staticmethod
     def summarize(log):
+        """A recorded decision (an AuditLog) as a session event."""
         context = log.context or {}
         return dict(
             timestamp=log.timestamp,
@@ -270,10 +276,13 @@ class SessionActivity:
         else:
             return None
 
-        events = [
-            SessionProfile.summarize(log)
-            for log in queryset.order_by("-timestamp")[:cls.MAX_EVENTS]
-        ]
+        # Only the columns a session reads. Whole rows carried each decision's
+        # context JSON, factors and timings: up to 500 of them a decision, for
+        # one boolean out of the context.
+        events = list(
+            queryset.order_by("-timestamp").values(*SessionProfile.FIELDS, blocked=F("context__should_block"))
+            [:cls.MAX_EVENTS]
+        )
 
         return SessionProfile(origin=origin, events=events, now=now)
 
