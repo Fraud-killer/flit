@@ -11,6 +11,7 @@ recently cleared, not yet spent.
 import logging
 from datetime import timedelta
 
+from django.db import transaction
 from django.utils import timezone
 from devkit.message import Message
 
@@ -40,12 +41,23 @@ class ChallengeReplay:
             context=dict(score=0.0, reason=reason, challenge_id=str(challenge_id)),
         )
 
+        # The read, the checks and the increment are one transaction, holding
+        # the row: two replays arriving together cannot both spend the last
+        # one. Postgres refuses select_for_update outside a transaction, so
+        # before this every replay there failed and was logged as an error,
+        # and a customer who cleared a step-up was asked again. SQLite, which
+        # CI runs, ignores the lock, which is how it went unnoticed.
+        with transaction.atomic():
+            return cls._consume(application, client_id, challenge_id, rejected)
+
+    @classmethod
+    def _consume(cls, application, client_id, challenge_id, rejected):
         challenge = (
             Challenge.objects
             .select_for_update(of=("self",))
             .filter(id=challenge_id, application=application)
             .first()
-        ) if Challenge.objects.filter(id=challenge_id, application=application).exists() else None
+        )
 
         if challenge is None:
             return rejected("unknown")
